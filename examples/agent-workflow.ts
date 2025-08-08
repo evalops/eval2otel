@@ -42,7 +42,7 @@ const agentEvalResult: EvalResult = {
   },
   
   performance: {
-    duration: 8500, // milliseconds
+    duration: 8.5, // seconds
   },
   
   agent: {
@@ -110,7 +110,7 @@ const ragEvalResult: EvalResult = {
   },
   
   performance: {
-    duration: 3200,
+    duration: 3.2, // seconds
   },
   
   conversation: {
@@ -200,7 +200,7 @@ const workflowStepResult: EvalResult = {
   },
   
   performance: {
-    duration: 1200,
+    duration: 1.2, // seconds
   },
   
   workflow: {

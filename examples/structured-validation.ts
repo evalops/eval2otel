@@ -140,7 +140,8 @@ async function validateSentimentWithRetry() {
       }],
     },
     usage: { inputTokens: 40, outputTokens: 50 },
-    performance: { duration: 1200 + result.duration },
+    // Convert validation duration (ms) to seconds for performance
+    performance: { duration: (1200 + result.duration) / 1000 },
   };
   
   // Process with validation metrics
@@ -230,7 +231,7 @@ const entityResult: EvalResult = {
   },
   
   performance: {
-    duration: 1500,
+    duration: 1.5, // seconds
   },
 };
 
@@ -299,7 +300,7 @@ const qaResult: EvalResult = {
   },
   
   performance: {
-    duration: 2000,
+    duration: 2.0, // seconds
   },
   
   // Include RAG data if this was from retrieval
