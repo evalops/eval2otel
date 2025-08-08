@@ -187,6 +187,7 @@ export {
   CommonSchemas,
   createValidationWrapper 
 } from './validation';
+export { ATTR } from './attributes';
 
 // Convenience function for quick setup
 export function createEval2Otel(config: OtelConfig): Eval2Otel {
