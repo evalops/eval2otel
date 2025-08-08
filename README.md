@@ -16,6 +16,7 @@ Modern AI applications need robust observability to understand performance, qual
 - **🚀 Production Monitoring** - Monitor AI quality and performance in real-time
 - **🛡️ Privacy Controls** - Opt-in content capture with built-in data protection
 - **⚡ Zero-Config Setup** - Works out of the box with any OpenTelemetry backend
+- **🦙 Local LLM Support** - Native integration with Ollama for local model observability
 
 ## Features
 
@@ -27,6 +28,7 @@ Modern AI applications need robust observability to understand performance, qual
 - 📚 **RAG Support**: Specialized metrics for Retrieval-Augmented Generation pipelines
 - 🔒 **Privacy Controls**: Opt-in content capturing for sensitive data
 - 📈 **Custom Metrics**: Support for evaluation-specific metrics like accuracy, BLEU, ROUGE
+- 🦙 **Ollama Integration**: Built-in converters for Ollama's native and OpenAI-compatible APIs
 
 ## Installation
 
@@ -97,6 +99,66 @@ eval2otel.processEvaluationWithMetrics(evalResult, {
   toxicity: 0.02,
 });
 ```
+
+## Ollama Integration
+
+eval2otel provides native support for [Ollama](https://ollama.ai), enabling complete observability for local LLM deployments:
+
+### Using Ollama's Native API
+
+```typescript
+import { createEval2Otel, convertOllamaToEval2Otel } from 'eval2otel';
+
+const eval2otel = createEval2Otel({
+  serviceName: 'my-ollama-service',
+  captureContent: true,
+});
+
+// Make request to Ollama
+const request = {
+  model: 'llama3.2',
+  messages: [{ role: 'user', content: 'Hello!' }],
+  temperature: 0.7,
+};
+
+const startTime = Date.now();
+const response = await fetch('http://localhost:11434/api/chat', {
+  method: 'POST',
+  body: JSON.stringify(request),
+});
+const ollamaResponse = await response.json();
+
+// Convert Ollama response to eval2otel format
+const evalResult = convertOllamaToEval2Otel(request, ollamaResponse, startTime);
+
+// Process with quality metrics
+eval2otel.processEvaluation(evalResult, {
+  metrics: { accuracy: 0.95, relevance: 0.88 },
+  attributes: { 'model.local': 'true' },
+});
+```
+
+### Using OpenAI-Compatible Endpoint
+
+```typescript
+import { convertOpenAICompatibleToEval2Otel } from 'eval2otel';
+
+// Ollama's OpenAI-compatible endpoint
+const response = await fetch('http://localhost:11434/v1/chat/completions', {
+  method: 'POST',
+  body: JSON.stringify({ model: 'mistral', messages: [...] }),
+});
+
+const evalResult = convertOpenAICompatibleToEval2Otel(
+  request, 
+  await response.json(), 
+  startTime, 
+  Date.now(),
+  { system: 'ollama' }
+);
+```
+
+See [Ollama Integration Guide](./examples/ollama-integration.md) for detailed examples including tool execution, model comparison, and performance benchmarking.
 
 ## Supported Operations
 
@@ -397,6 +459,15 @@ eval2otel works with any OpenTelemetry-compatible backend. See [Backend Integrat
 - **New Relic**
 - **Jaeger**
 - **AWS X-Ray**
+
+### Supported AI Providers
+
+eval2otel includes built-in support for:
+
+- **OpenAI** - GPT models, embeddings, and tool execution
+- **Anthropic** - Claude models and function calling
+- **Ollama** - Local LLMs with native and OpenAI-compatible APIs
+- **Custom Providers** - Any provider following the `EvalResult` schema
 - Generic OTLP endpoints
 
 ### Quick OTLP Setup
@@ -477,6 +548,9 @@ See the `examples/` directory for complete working examples:
 - [`basic-usage.ts`](./examples/basic-usage.ts) - Simple chat completion evaluation
 - [`tool-execution.ts`](./examples/tool-execution.ts) - Tool/function calling evaluation
 - [`agent-workflow.ts`](./examples/agent-workflow.ts) - Agent execution and RAG evaluation
+- [`ollama-basic.js`](./examples/ollama-basic.js) - Basic Ollama integration
+- [`ollama-real-test.js`](./examples/ollama-real-test.js) - Real Ollama instance testing
+- [`ollama-integration.md`](./examples/ollama-integration.md) - Complete Ollama guide
 
 ## OpenTelemetry Compatibility
 
@@ -514,6 +588,43 @@ graph TB
 | **Spans** | Operation tracking | `chat gpt-4`, `embeddings text-ada-002` |
 | **Events** | Conversation flow | `gen_ai.user.message`, `gen_ai.assistant.message` |
 | **Metrics** | Performance & usage | `gen_ai.client.token.usage`, `eval.accuracy` |
+
+## API Reference
+
+### Provider Converters
+
+#### `convertOllamaToEval2Otel(request, response, startTime, options?)`
+
+Converts Ollama native API responses to eval2otel format.
+
+- **request**: Ollama request object with model, messages, temperature, etc.
+- **response**: Ollama response with message, token counts, and timings
+- **startTime**: Request start timestamp (milliseconds)
+- **options**: Optional conversion settings (evalId, conversationId, toolExecution)
+
+#### `convertOpenAICompatibleToEval2Otel(request, response, startTime, endTime, options?)`
+
+Converts OpenAI-compatible API responses (including Ollama's OpenAI endpoint) to eval2otel format.
+
+- **request**: OpenAI-style request object
+- **response**: OpenAI-style response with choices and usage
+- **startTime**: Request start timestamp (milliseconds)
+- **endTime**: Request end timestamp (milliseconds)
+- **options**: Optional settings (system, evalId, conversationId)
+
+### Core Functions
+
+#### `createEval2Otel(config)`
+
+Creates and initializes an eval2otel instance with OpenTelemetry SDK.
+
+#### `processEvaluation(evalResult, options?)`
+
+Processes a single evaluation result and generates telemetry data.
+
+#### `processEvaluations(evalResults[], options?)`
+
+Batch processes multiple evaluation results.
 
 ## 🤝 Contributing
 
