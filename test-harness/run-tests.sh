@@ -15,6 +15,10 @@ docker compose up -d otel-collector jaeger prometheus
 echo "⏳ Waiting for infrastructure to start..."
 sleep 10
 
+# Show collector logs to debug startup issues
+echo "📋 OpenTelemetry Collector logs:"
+docker compose logs otel-collector || echo "⚠️  No collector logs available"
+
 # Run the test
 echo "🧪 Running eval2otel tests..."
 docker compose run --rm test-runner
