@@ -9,7 +9,9 @@
     "dev": "tsc --watch",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
-    "format": "prettier --write src/**/*.ts"
+    "format": "prettier --write src/**/*.ts",
+    "prepublishOnly": "npm run build && npm test",
+    "prepack": "npm run build"
   },
   "keywords": [
     "opentelemetry",
@@ -18,8 +20,20 @@
     "metrics",
     "observability"
   ],
-  "author": "",
+  "author": "evalops",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/evalops/eval2otel.git"
+  },
+  "homepage": "https://github.com/evalops/eval2otel",
+  "bugs": "https://github.com/evalops/eval2otel/issues",
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",

@@ -70,10 +70,28 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) for commit m
 
 ## Testing
 
-- Write unit tests for all new functionality
+### Unit Tests
+- Write unit tests for all new functionality in the `test/` directory
+- Use Jest testing framework with proper mocking
 - Ensure all existing tests continue to pass
 - Aim for high test coverage
-- Test with different OpenTelemetry backends when possible
+
+### Integration Testing
+- Use the E2E test harness to validate OpenTelemetry integration
+- Test with different backends (Jaeger, Prometheus, etc.)
+- Verify metric units and semantic conventions compliance
+
+### Running Tests
+```bash
+# Unit tests
+npm test
+
+# E2E testing (requires Docker)
+cd /tmp/eval2otel-e2e-test
+docker-compose up -d
+cd /path/to/eval2otel
+node examples/basic-usage.js
+```
 
 ## Pull Request Guidelines
 
