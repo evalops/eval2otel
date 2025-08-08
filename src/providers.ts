@@ -82,7 +82,7 @@ export function convertOllamaToEval2Otel(
   startTime: number,
   options: OllamaConversionOptions = {}
 ): EvalResult {
-  const evalId = options.evalId || `ollama-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const evalId = options.evalId ?? `ollama-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const timestamp = startTime;
   
   // Calculate performance metrics (convert nanoseconds to seconds)
@@ -99,10 +99,10 @@ export function convertOllamaToEval2Otel(
   // Build response choices
   const choices = [{
     index: 0,
-    finishReason: response.done_reason || (response.done ? 'stop' : 'length'),
+    finishReason: response.done_reason ?? (response.done ? 'stop' : 'length'),
     message: {
       role: response.message.role,
-      content: response.message.content || '',
+      content: response.message.content ?? '',
       toolCalls: response.message.tool_calls?.map((call, idx) => ({
         id: `call_${idx}`,
         type: 'function',
@@ -119,7 +119,7 @@ export function convertOllamaToEval2Otel(
     timestamp,
     model: response.model,
     system: 'ollama',
-    operation: operation as any,
+    operation: operation as EvalResult['operation'],
     
     request: {
       model: request.model,
@@ -135,14 +135,14 @@ export function convertOllamaToEval2Otel(
     response: {
       id: `ollama-${timestamp}`,
       model: response.model,
-      finishReasons: [response.done_reason || 'stop'],
+      finishReasons: [response.done_reason ?? 'stop'],
       choices,
     },
     
     usage: {
       inputTokens: response.prompt_eval_count,
       outputTokens: response.eval_count,
-      totalTokens: (response.prompt_eval_count || 0) + (response.eval_count || 0),
+      totalTokens: (response.prompt_eval_count ?? 0) + (response.eval_count ?? 0),
     },
     
     performance: {
@@ -155,9 +155,9 @@ export function convertOllamaToEval2Otel(
   // Add conversation context if provided
   if (options.conversationMessages) {
     evalResult.conversation = {
-      id: options.conversationId || `conv-${evalId}`,
+      id: options.conversationId ?? `conv-${evalId}`,
       messages: options.conversationMessages.map(msg => ({
-        role: msg.role as any,
+        role: msg.role as 'system' | 'user' | 'assistant' | 'tool',
         content: msg.content,
         toolCalls: msg.tool_calls?.map((call, idx) => ({
           id: `call_${idx}`,
@@ -216,14 +216,27 @@ export interface OpenAICompatibleResponse {
   };
 }
 
+export interface OpenAICompatibleRequest {
+  model: string;
+  messages?: Array<{ role: string; content: string | null }>;
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  stop?: string[];
+  seed?: number;
+  n?: number;
+}
+
 export function convertOpenAICompatibleToEval2Otel(
-  request: any,
+  request: OpenAICompatibleRequest,
   response: OpenAICompatibleResponse,
   startTime: number,
   endTime: number,
   options: { evalId?: string; conversationId?: string; system?: string } = {}
 ): EvalResult {
-  const evalId = options.evalId || `openai-compat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const evalId = options.evalId ?? `openai-compat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const duration = (endTime - startTime) / 1000; // Convert to seconds
   
   const hasToolCalls = response.choices.some(choice => 
@@ -234,7 +247,7 @@ export function convertOpenAICompatibleToEval2Otel(
     id: evalId,
     timestamp: startTime,
     model: response.model,
-    system: options.system || 'openai-compatible',
+    system: options.system ?? 'openai-compatible',
     operation: hasToolCalls ? 'execute_tool' : 'chat',
     
     request: {
@@ -246,7 +259,7 @@ export function convertOpenAICompatibleToEval2Otel(
       presencePenalty: request.presence_penalty,
       stopSequences: request.stop,
       seed: request.seed,
-      choiceCount: request.n || 1,
+      choiceCount: request.n ?? 1,
     },
     
     response: {
@@ -258,13 +271,13 @@ export function convertOpenAICompatibleToEval2Otel(
         finishReason: choice.finish_reason,
         message: {
           role: choice.message.role,
-          content: choice.message.content || '',
+          content: choice.message.content ?? '',
           toolCalls: choice.message.tool_calls?.map(call => ({
             id: call.id,
             type: call.type,
             function: {
               name: call.function.name,
-              arguments: JSON.parse(call.function.arguments),
+              arguments: JSON.parse(call.function.arguments) as Record<string, unknown>,
             },
           })),
         },
