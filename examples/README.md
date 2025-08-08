@@ -27,8 +27,8 @@ node examples/basic-usage.js
 
 Shows how to handle evaluations that involve tool/function calls:
 - Tool execution metrics
-- Custom span creation with `withSpan()`
-- Parent-child span relationships
+- Tool call arguments and results
+- OpenTelemetry GenAI tool conventions
 
 ```bash
 node examples/tool-execution.js
@@ -37,9 +37,9 @@ node examples/tool-execution.js
 ### 3. Batch Processing (`batch-processing.js`)
 
 Illustrates processing multiple evaluations with proper tracing:
-- Batch operations with parent spans
+- Batch operations with `processEvaluations()`
+- Quality metrics integration
 - Aggregated metrics calculation
-- Consistent attribute naming across evaluations
 
 ```bash
 node examples/batch-processing.js
@@ -47,15 +47,15 @@ node examples/batch-processing.js
 
 ## OpenTelemetry Setup
 
-To see the telemetry data from these examples, you need an OpenTelemetry collector and backend. The quickest way is using our E2E test setup:
+To see the telemetry data from these examples, you need an OpenTelemetry collector and backend. The quickest way is using our test harness:
 
 ```bash
 # From the root directory
-cd /tmp/eval2otel-e2e-test
+cd test-harness
 docker-compose up -d
 
 # Run examples
-cd /path/to/eval2otel
+cd ..
 node examples/basic-usage.js
 
 # View data
