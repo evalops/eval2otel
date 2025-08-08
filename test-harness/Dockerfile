@@ -2,15 +2,16 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Create package.json for test dependencies
+# Create basic package.json and install test dependencies
 RUN npm init -y && \
     npm install axios
 
-# Copy built eval2otel dist files
-COPY ../dist ./node_modules/eval2otel/dist/
-COPY ../package.json ./node_modules/eval2otel/package.json
+# Create eval2otel module structure and copy dist files
+RUN mkdir -p node_modules/eval2otel
+COPY dist/ ./node_modules/eval2otel/dist/
+COPY package.json ./node_modules/eval2otel/
 
-COPY test-e2e.js .
-COPY verify-telemetry.js .
+COPY test-harness/test-e2e.js .
+COPY test-harness/verify-telemetry.js .
 
 CMD ["node", "test-e2e.js"]
