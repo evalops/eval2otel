@@ -23,6 +23,8 @@ Modern AI applications need robust observability to understand performance, qual
 - 📊 **Comprehensive Metrics**: Tracks token usage, latency, and custom quality metrics
 - 🎯 **Rich Spans & Events**: Creates detailed spans with conversation and choice events
 - 🛠️ **Tool Support**: Full support for AI tool execution and function calling
+- 🤖 **Agent & Workflow Tracking**: Monitor multi-step AI agent executions and complex workflows
+- 📚 **RAG Support**: Specialized metrics for Retrieval-Augmented Generation pipelines
 - 🔒 **Privacy Controls**: Opt-in content capturing for sensitive data
 - 📈 **Custom Metrics**: Support for evaluation-specific metrics like accuracy, BLEU, ROUGE
 
@@ -150,6 +152,48 @@ const embeddingEval: EvalResult = {
 };
 ```
 
+### AI Agent Execution
+```typescript
+const agentEval: EvalResult = {
+  operation: 'agent_execution',
+  // ... other fields
+  agent: {
+    name: 'research-agent',
+    type: 'orchestrator',
+    plan: 'search -> analyze -> summarize',
+    reasoning: 'Multi-source information gathering required',
+    steps: [
+      { name: 'search', status: 'completed', duration: 2000 },
+      { name: 'analyze', status: 'completed', duration: 3500 },
+      { name: 'summarize', status: 'running', duration: null }
+    ]
+  }
+};
+```
+
+### RAG (Retrieval-Augmented Generation)
+```typescript
+const ragEval: EvalResult = {
+  operation: 'chat',
+  // ... other fields
+  rag: {
+    retrievalMethod: 'hybrid',
+    documentsRetrieved: 10,
+    documentsUsed: 3,
+    chunks: [
+      { id: 'doc1_chunk3', source: 'manual.pdf', relevanceScore: 0.92, position: 0, tokens: 256 },
+      { id: 'doc2_chunk1', source: 'faq.md', relevanceScore: 0.87, position: 1, tokens: 189 }
+    ],
+    metrics: {
+      contextPrecision: 0.88,
+      contextRecall: 0.91,
+      answerRelevance: 0.93,
+      faithfulness: 0.95
+    }
+  }
+};
+```
+
 ## Generated OpenTelemetry Data
 
 ### Spans
@@ -208,6 +252,8 @@ eval2otel follows OpenTelemetry GenAI semantic conventions. Here's how `EvalResu
 | `text_completion` | `gen_ai.chat` | Text completion operations |
 | `embeddings` | `gen_ai.embeddings` | Embedding generation |
 | `execute_tool` | `gen_ai.execute_tool` | Tool execution |
+| `agent_execution` | `gen_ai.agent` | AI agent orchestration |
+| `workflow_step` | `gen_ai.workflow` | Workflow step execution |
 
 ### Span Attributes
 
@@ -353,6 +399,7 @@ See the `examples/` directory for complete working examples:
 
 - [`basic-usage.ts`](./examples/basic-usage.ts) - Simple chat completion evaluation
 - [`tool-execution.ts`](./examples/tool-execution.ts) - Tool/function calling evaluation
+- [`agent-workflow.ts`](./examples/agent-workflow.ts) - Agent execution and RAG evaluation
 
 ## OpenTelemetry Compatibility
 

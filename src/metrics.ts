@@ -13,6 +13,17 @@ export class Eval2OtelMetrics {
   private requestDurationHistogram!: Histogram;
   private timeToFirstTokenHistogram!: Histogram;
   private timePerOutputTokenHistogram!: Histogram;
+  
+  // RAG metrics
+  private ragContextPrecisionHistogram!: Histogram;
+  private ragContextRecallHistogram!: Histogram;
+  private ragAnswerRelevanceHistogram!: Histogram;
+  private ragFaithfulnessHistogram!: Histogram;
+  private ragDocumentsRetrievedHistogram!: Histogram;
+  
+  // Agent metrics
+  private agentStepDurationHistogram!: Histogram;
+  private agentTotalStepsHistogram!: Histogram;
 
   constructor(config: OtelConfig) {
     this.config = config;
@@ -47,6 +58,43 @@ export class Eval2OtelMetrics {
     this.timePerOutputTokenHistogram = this.meter.createHistogram('gen_ai.server.time_per_output_token', {
       description: 'Measures the time per output token generated after the first token',
       unit: 's',
+    });
+    
+    // RAG metrics
+    this.ragContextPrecisionHistogram = this.meter.createHistogram('gen_ai.rag.context_precision', {
+      description: 'Measures the precision of retrieved context in RAG systems',
+      unit: '1',
+    });
+    
+    this.ragContextRecallHistogram = this.meter.createHistogram('gen_ai.rag.context_recall', {
+      description: 'Measures the recall of retrieved context in RAG systems',
+      unit: '1',
+    });
+    
+    this.ragAnswerRelevanceHistogram = this.meter.createHistogram('gen_ai.rag.answer_relevance', {
+      description: 'Measures the relevance of generated answers in RAG systems',
+      unit: '1',
+    });
+    
+    this.ragFaithfulnessHistogram = this.meter.createHistogram('gen_ai.rag.faithfulness', {
+      description: 'Measures the faithfulness of generated answers to retrieved context',
+      unit: '1',
+    });
+    
+    this.ragDocumentsRetrievedHistogram = this.meter.createHistogram('gen_ai.rag.documents_retrieved', {
+      description: 'Number of documents retrieved in RAG operations',
+      unit: '{document}',
+    });
+    
+    // Agent metrics
+    this.agentStepDurationHistogram = this.meter.createHistogram('gen_ai.agent.step_duration', {
+      description: 'Duration of individual agent steps',
+      unit: 'ms',
+    });
+    
+    this.agentTotalStepsHistogram = this.meter.createHistogram('gen_ai.agent.total_steps', {
+      description: 'Total number of steps in agent execution',
+      unit: '{step}',
     });
   }
 
@@ -106,6 +154,44 @@ export class Eval2OtelMetrics {
 
     // Record request duration (same as operation duration for client-side)
     this.requestDurationHistogram.record(evalResult.performance.duration, attributes);
+
+    // Record RAG metrics if present
+    if (evalResult.rag) {
+      if (evalResult.rag.documentsRetrieved !== undefined) {
+        this.ragDocumentsRetrievedHistogram.record(evalResult.rag.documentsRetrieved, attributes);
+      }
+      if (evalResult.rag.metrics) {
+        if (evalResult.rag.metrics.contextPrecision !== undefined) {
+          this.ragContextPrecisionHistogram.record(evalResult.rag.metrics.contextPrecision, attributes);
+        }
+        if (evalResult.rag.metrics.contextRecall !== undefined) {
+          this.ragContextRecallHistogram.record(evalResult.rag.metrics.contextRecall, attributes);
+        }
+        if (evalResult.rag.metrics.answerRelevance !== undefined) {
+          this.ragAnswerRelevanceHistogram.record(evalResult.rag.metrics.answerRelevance, attributes);
+        }
+        if (evalResult.rag.metrics.faithfulness !== undefined) {
+          this.ragFaithfulnessHistogram.record(evalResult.rag.metrics.faithfulness, attributes);
+        }
+      }
+    }
+    
+    // Record agent metrics if present
+    if (evalResult.agent) {
+      if (evalResult.agent.steps) {
+        this.agentTotalStepsHistogram.record(evalResult.agent.steps.length, attributes);
+        
+        evalResult.agent.steps.forEach(step => {
+          if (step.duration !== undefined) {
+            this.agentStepDurationHistogram.record(step.duration, {
+              ...attributes,
+              'gen_ai.agent.step.name': step.name,
+              'gen_ai.agent.step.status': step.status,
+            });
+          }
+        });
+      }
+    }
 
     // Record additional custom metrics if provided in options
     if (options?.metrics) {

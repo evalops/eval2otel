@@ -7,7 +7,7 @@ export const EvalResultSchema = z.object({
   timestamp: z.number(),
   model: z.string(),
   system: z.string().optional(),
-  operation: z.enum(['chat', 'text_completion', 'embeddings', 'execute_tool']),
+  operation: z.enum(['chat', 'text_completion', 'embeddings', 'execute_tool', 'agent_execution', 'workflow_step']),
   
   // Request data
   request: z.object({
@@ -91,6 +91,51 @@ export const EvalResultSchema = z.object({
     callId: z.string().optional(),
     result: z.record(z.string(), z.unknown()).optional(),
   }).optional(),
+  
+  // Agent execution data
+  agent: z.object({
+    name: z.string(),
+    type: z.enum(['orchestrator', 'executor', 'planner', 'retriever', 'evaluator']).optional(),
+    plan: z.string().optional(),
+    reasoning: z.string().optional(),
+    steps: z.array(z.object({
+      name: z.string(),
+      type: z.string().optional(),
+      status: z.enum(['pending', 'running', 'completed', 'failed']),
+      duration: z.number().optional(), // milliseconds
+      error: z.string().optional(),
+    })).optional(),
+  }).optional(),
+  
+  // Workflow data
+  workflow: z.object({
+    id: z.string(),
+    name: z.string().optional(),
+    step: z.string().optional(),
+    totalSteps: z.number().optional(),
+    parentWorkflowId: z.string().optional(),
+    state: z.record(z.string(), z.unknown()).optional(),
+  }).optional(),
+  
+  // RAG-specific data
+  rag: z.object({
+    retrievalMethod: z.enum(['vector_search', 'keyword', 'hybrid']).optional(),
+    documentsRetrieved: z.number().optional(),
+    documentsUsed: z.number().optional(),
+    chunks: z.array(z.object({
+      id: z.string(),
+      source: z.string(),
+      relevanceScore: z.number(),
+      position: z.number(),
+      tokens: z.number().optional(),
+    })).optional(),
+    metrics: z.object({
+      contextPrecision: z.number().optional(),
+      contextRecall: z.number().optional(),
+      answerRelevance: z.number().optional(),
+      faithfulness: z.number().optional(),
+    }).optional(),
+  }).optional(),
 });
 
 export type EvalResult = z.infer<typeof EvalResultSchema>;
@@ -165,6 +210,29 @@ export interface GenAIAttributes {
   'gen_ai.tool.call.id'?: string;
   'gen_ai.tool.description'?: string;
   'gen_ai.tool.name'?: string;
+  
+  // Agent specific
+  'gen_ai.agent.name'?: string;
+  'gen_ai.agent.type'?: string;
+  'gen_ai.agent.plan'?: string;
+  'gen_ai.agent.reasoning'?: string;
+  'gen_ai.agent.current_step'?: string;
+  'gen_ai.agent.total_steps'?: number;
+  
+  // Workflow specific
+  'gen_ai.workflow.id'?: string;
+  'gen_ai.workflow.name'?: string;
+  'gen_ai.workflow.step'?: string;
+  'gen_ai.workflow.parent_id'?: string;
+  
+  // RAG specific
+  'gen_ai.rag.retrieval_method'?: string;
+  'gen_ai.rag.documents_retrieved'?: number;
+  'gen_ai.rag.documents_used'?: number;
+  'gen_ai.rag.context_precision'?: number;
+  'gen_ai.rag.context_recall'?: number;
+  'gen_ai.rag.answer_relevance'?: number;
+  'gen_ai.rag.faithfulness'?: number;
   
   // Index signature to allow additional string attributes
   [key: string]: string | number | boolean | string[] | undefined;

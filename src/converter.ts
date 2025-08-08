@@ -57,6 +57,16 @@ export class Eval2OtelConverter {
       this.addChoiceEvents(span, validated);
     }
 
+    // Add agent step events
+    if (validated.agent?.steps && this.shouldCaptureContent()) {
+      this.addAgentStepEvents(span, validated);
+    }
+
+    // Add RAG chunk events
+    if (validated.rag?.chunks && this.shouldCaptureContent()) {
+      this.addRAGChunkEvents(span, validated);
+    }
+
     span.end(endTime);
   }
 
@@ -72,6 +82,10 @@ export class Eval2OtelConverter {
         return 'gen_ai.embeddings';
       case 'execute_tool':
         return 'gen_ai.execute_tool';
+      case 'agent_execution':
+        return 'gen_ai.agent';
+      case 'workflow_step':
+        return 'gen_ai.workflow';
       default:
         return 'gen_ai.operation';
     }
@@ -186,6 +200,68 @@ export class Eval2OtelConverter {
       }
     }
 
+    // Agent attributes
+    if (evalResult.agent) {
+      attributes['gen_ai.agent.name'] = evalResult.agent.name;
+      if (evalResult.agent.type) {
+        attributes['gen_ai.agent.type'] = evalResult.agent.type;
+      }
+      if (evalResult.agent.plan) {
+        attributes['gen_ai.agent.plan'] = evalResult.agent.plan;
+      }
+      if (evalResult.agent.reasoning) {
+        attributes['gen_ai.agent.reasoning'] = evalResult.agent.reasoning;
+      }
+      if (evalResult.agent.steps) {
+        const runningStep = evalResult.agent.steps.find(s => s.status === 'running');
+        if (runningStep) {
+          attributes['gen_ai.agent.current_step'] = runningStep.name;
+        }
+        attributes['gen_ai.agent.total_steps'] = evalResult.agent.steps.length;
+      }
+    }
+
+    // Workflow attributes
+    if (evalResult.workflow) {
+      attributes['gen_ai.workflow.id'] = evalResult.workflow.id;
+      if (evalResult.workflow.name) {
+        attributes['gen_ai.workflow.name'] = evalResult.workflow.name;
+      }
+      if (evalResult.workflow.step) {
+        attributes['gen_ai.workflow.step'] = evalResult.workflow.step;
+      }
+      if (evalResult.workflow.parentWorkflowId) {
+        attributes['gen_ai.workflow.parent_id'] = evalResult.workflow.parentWorkflowId;
+      }
+    }
+
+    // RAG attributes
+    if (evalResult.rag) {
+      if (evalResult.rag.retrievalMethod) {
+        attributes['gen_ai.rag.retrieval_method'] = evalResult.rag.retrievalMethod;
+      }
+      if (evalResult.rag.documentsRetrieved !== undefined) {
+        attributes['gen_ai.rag.documents_retrieved'] = evalResult.rag.documentsRetrieved;
+      }
+      if (evalResult.rag.documentsUsed !== undefined) {
+        attributes['gen_ai.rag.documents_used'] = evalResult.rag.documentsUsed;
+      }
+      if (evalResult.rag.metrics) {
+        if (evalResult.rag.metrics.contextPrecision !== undefined) {
+          attributes['gen_ai.rag.context_precision'] = evalResult.rag.metrics.contextPrecision;
+        }
+        if (evalResult.rag.metrics.contextRecall !== undefined) {
+          attributes['gen_ai.rag.context_recall'] = evalResult.rag.metrics.contextRecall;
+        }
+        if (evalResult.rag.metrics.answerRelevance !== undefined) {
+          attributes['gen_ai.rag.answer_relevance'] = evalResult.rag.metrics.answerRelevance;
+        }
+        if (evalResult.rag.metrics.faithfulness !== undefined) {
+          attributes['gen_ai.rag.faithfulness'] = evalResult.rag.metrics.faithfulness;
+        }
+      }
+    }
+
     // Add additional attributes if provided
     if (additionalAttributes) {
       Object.assign(attributes, additionalAttributes);
@@ -267,6 +343,56 @@ export class Eval2OtelConverter {
       }
 
       span.addEvent('gen_ai.assistant.message', attributes);
+    });
+  }
+
+  /**
+   * Add agent step events to span
+   */
+  private addAgentStepEvents(span: Span, evalResult: EvalResult): void {
+    if (!evalResult.agent?.steps) return;
+
+    evalResult.agent.steps.forEach((step, index) => {
+      const attributes: Record<string, any> = {
+        'gen_ai.agent.step.index': index,
+        'gen_ai.agent.step.name': step.name,
+        'gen_ai.agent.step.status': step.status,
+      };
+
+      if (step.type) {
+        attributes['gen_ai.agent.step.type'] = step.type;
+      }
+      if (step.duration !== undefined) {
+        attributes['gen_ai.agent.step.duration'] = step.duration;
+      }
+      if (step.error) {
+        attributes['gen_ai.agent.step.error'] = step.error;
+      }
+
+      span.addEvent('gen_ai.agent.step', attributes);
+    });
+  }
+
+  /**
+   * Add RAG chunk events to span
+   */
+  private addRAGChunkEvents(span: Span, evalResult: EvalResult): void {
+    if (!evalResult.rag?.chunks) return;
+
+    evalResult.rag.chunks.forEach((chunk, index) => {
+      const attributes: Record<string, any> = {
+        'gen_ai.rag.chunk.index': index,
+        'gen_ai.rag.chunk.id': chunk.id,
+        'gen_ai.rag.chunk.source': chunk.source,
+        'gen_ai.rag.chunk.relevance_score': chunk.relevanceScore,
+        'gen_ai.rag.chunk.position': chunk.position,
+      };
+
+      if (chunk.tokens !== undefined) {
+        attributes['gen_ai.rag.chunk.tokens'] = chunk.tokens;
+      }
+
+      span.addEvent('gen_ai.rag.chunk', attributes);
     });
   }
 }

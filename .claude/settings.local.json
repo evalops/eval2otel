@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(node:*)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "mcp__github__create_issue",
+      "Bash(gh issue create:*)",
+      "Bash(npx tsc:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": []
+  }
+}
