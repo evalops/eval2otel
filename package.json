@@ -1,6 +1,6 @@
 {
   "name": "eval2otel",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Library to convert evaluation metrics and traces to OpenTelemetry GenAI semantic conventions",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
