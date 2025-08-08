@@ -208,13 +208,12 @@ The library creates spans following the `{operation} {model}` naming convention 
 - And many more following OpenTelemetry conventions
 
 ### Events
-When content capture is enabled, the library adds events for:
+When content capture is enabled (and operational metadata emission is on), the library adds events for:
 
 - `gen_ai.system.message`: System instructions
 - `gen_ai.user.message`: User inputs  
 - `gen_ai.assistant.message`: Assistant responses
 - `gen_ai.tool.message`: Tool call results
-- `gen_ai.choice`: Response choices
 
 ### Metrics
 Automatically recorded metrics include:
@@ -235,9 +234,12 @@ interface OtelConfig {
   captureContent?: boolean;      // Opt-in for sensitive content
   sampleContentRate?: number;    // Content sampling rate (0.0-1.0)
   contentMaxLength?: number;     // Optional: truncate captured content (characters)
+  markTruncatedContent?: boolean; // Optional: add gen_ai.message.content_truncated flag when truncated
   contentSampler?: (evalResult: EvalResult) => boolean; // Optional custom sampler
   emitOperationalMetadata?: boolean; // Suppress conversation/choice/agent/RAG events when false (default true)
   redact?: (content: string) => string | null; // Custom redaction
+  redactMessageContent?: (content: string, info: { role: string }) => string | null; // Field-level redaction
+  redactToolArguments?: (argsJson: string, info: { functionName: string; callId?: string }) => string | null; // Field-level redaction
   endpoint?: string;            // OpenTelemetry endpoint
   exporterProtocol?: 'grpc' | 'http/protobuf' | 'http/json'; // OTLP protocol
   exporterHeaders?: Record<string, string>; // OTLP headers (e.g., auth)
@@ -282,9 +284,9 @@ eval2otel follows OpenTelemetry GenAI semantic conventions. Here's how `EvalResu
 
 | Event Name | Trigger | Attributes |
 |------------|---------|------------|
-| `gen_ai.system.message` | System message | `content`, `role`, `index` |
-| `gen_ai.user.message` | User message | `content`, `role`, `index` |
-| `gen_ai.assistant.message` | Assistant response | `content`, `role`, `choice.index` |
+| `gen_ai.system.message` | System message | `gen_ai.message.content`, `gen_ai.message.role`, `gen_ai.message.index`, `gen_ai.message.content_truncated?` |
+| `gen_ai.user.message` | User message | `gen_ai.message.content`, `gen_ai.message.role`, `gen_ai.message.index`, `gen_ai.message.content_truncated?` |
+| `gen_ai.assistant.message` | Assistant response | `gen_ai.message.content`, `gen_ai.message.role`, `gen_ai.response.choice.index`, `gen_ai.response.finish_reason`, `gen_ai.message.content_truncated?` |
 | `gen_ai.tool.message` | Tool call/result | `gen_ai.tool.name`, `gen_ai.tool.call.id`, `gen_ai.tool.arguments`, `gen_ai.response.choice.index` |
 
 ### Metrics
