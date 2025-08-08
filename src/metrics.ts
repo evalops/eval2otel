@@ -4,6 +4,7 @@ import { EvalResult, OtelConfig, ProcessOptions } from './types';
 export class Eval2OtelMetrics {
   private meter: Meter;
   private config: OtelConfig;
+  private customHistograms: Map<string, Histogram> = new Map();
   
   // Client metrics
   private tokenUsageHistogram!: Histogram;
@@ -248,7 +249,11 @@ export class Eval2OtelMetrics {
     baseAttributes: Record<string, string | number>
   ): void {
     Object.entries(metrics).forEach(([name, value]) => {
-      const histogram = this.createEvalHistogram(name, `Custom evaluation metric: ${name}`);
+      let histogram = this.customHistograms.get(name);
+      if (!histogram) {
+        histogram = this.createEvalHistogram(name, `Custom evaluation metric: ${name}`);
+        this.customHistograms.set(name, histogram);
+      }
       histogram.record(value, {
         ...baseAttributes,
         'eval.metric.name': name,
