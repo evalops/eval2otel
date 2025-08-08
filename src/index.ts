@@ -69,6 +69,32 @@ export class Eval2Otel {
         .join(',');
     }
 
+    // Signal-specific overrides
+    if (this.config.tracesEndpoint) {
+      process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = this.config.tracesEndpoint;
+    }
+    if (this.config.metricsEndpoint) {
+      process.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT = this.config.metricsEndpoint;
+    }
+    if (this.config.logsEndpoint) {
+      process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT = this.config.logsEndpoint;
+    }
+    if (this.config.tracesHeaders && Object.keys(this.config.tracesHeaders).length > 0) {
+      process.env.OTEL_EXPORTER_OTLP_TRACES_HEADERS = Object.entries(this.config.tracesHeaders)
+        .map(([k, v]) => `${k}=${String(v)}`)
+        .join(',');
+    }
+    if (this.config.metricsHeaders && Object.keys(this.config.metricsHeaders).length > 0) {
+      process.env.OTEL_EXPORTER_OTLP_METRICS_HEADERS = Object.entries(this.config.metricsHeaders)
+        .map(([k, v]) => `${k}=${String(v)}`)
+        .join(',');
+    }
+    if (this.config.logsHeaders && Object.keys(this.config.logsHeaders).length > 0) {
+      process.env.OTEL_EXPORTER_OTLP_LOGS_HEADERS = Object.entries(this.config.logsHeaders)
+        .map(([k, v]) => `${k}=${String(v)}`)
+        .join(',');
+    }
+
     this.sdk = new NodeSDK(sdkConfig);
     this.sdk.start();
   }

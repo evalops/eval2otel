@@ -185,6 +185,16 @@ export interface OtelConfig {
   
   /** OTLP exporter headers (e.g., authentication) */
   exporterHeaders?: Record<string, string>;
+
+  /** Signal-specific endpoints (override global endpoint if provided) */
+  tracesEndpoint?: string;
+  metricsEndpoint?: string;
+  logsEndpoint?: string;
+
+  /** Signal-specific headers (override global headers if provided) */
+  tracesHeaders?: Record<string, string>;
+  metricsHeaders?: Record<string, string>;
+  logsHeaders?: Record<string, string>;
   
   /** Custom resource attributes */
   resourceAttributes?: Record<string, string | number | boolean>;
