@@ -137,10 +137,10 @@ export class Eval2OtelValidation {
   /**
    * Add validation events to a span
    */
-  addValidationEvents(
+  addValidationEvents<T>(
     span: Span,
     schemaName: string,
-    result: ValidationResult<any>
+    result: ValidationResult<T>
   ): void {
     if (result.success) {
       span.addEvent('gen_ai.validation.success', {
@@ -170,7 +170,7 @@ export class Eval2OtelValidation {
   /**
    * Get validation metrics for tracking
    */
-  getValidationMetrics(result: ValidationResult<any>): Record<string, number> {
+  getValidationMetrics<T>(result: ValidationResult<T>): Record<string, number> {
     return {
       'validation.success': result.success ? 1 : 0,
       'validation.attempts': result.attempts,
@@ -279,6 +279,7 @@ export function createValidationWrapper<T>(
   return (evalResult: EvalResult): EvalResult & { 
     validatedOutput?: T;
     validationMetrics?: Record<string, number>;
+    validationSchema?: string;
   } => {
     const validation = new Eval2OtelValidation();
     const result = validation.withSchema(schema, evalResult);
@@ -288,12 +289,14 @@ export function createValidationWrapper<T>(
         ...evalResult,
         validatedOutput: result.validation.data,
         validationMetrics: validation.getValidationMetrics(result.validation),
+        validationSchema: schemaName,
       };
     }
     
     return {
       ...evalResult,
       validationMetrics: validation.getValidationMetrics(result.validation!),
+      validationSchema: schemaName,
     };
   };
 }

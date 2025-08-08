@@ -353,7 +353,7 @@ export class Eval2OtelConverter {
     if (!evalResult.agent?.steps) return;
 
     evalResult.agent.steps.forEach((step, index) => {
-      const attributes: Record<string, any> = {
+      const attributes: Record<string, string | number | boolean> = {
         'gen_ai.agent.step.index': index,
         'gen_ai.agent.step.name': step.name,
         'gen_ai.agent.step.status': step.status,
@@ -380,7 +380,7 @@ export class Eval2OtelConverter {
     if (!evalResult.rag?.chunks) return;
 
     evalResult.rag.chunks.forEach((chunk, index) => {
-      const attributes: Record<string, any> = {
+      const attributes: Record<string, string | number | boolean> = {
         'gen_ai.rag.chunk.index': index,
         'gen_ai.rag.chunk.id': chunk.id,
         'gen_ai.rag.chunk.source': chunk.source,
