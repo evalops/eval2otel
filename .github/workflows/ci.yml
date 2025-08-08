@@ -30,6 +30,12 @@ jobs:
       
       - name: Build
         run: npm run build
+
+      - name: Type Check
+        run: npx tsc --noEmit
       
       - name: Test
         run: npm test
+
+      - name: Package (dry run)
+        run: npm pack --dry-run
