@@ -21,7 +21,7 @@ async function waitForService(url, name, maxRetries = 30) {
 async function runTests() {
   try {
     // Wait for services
-    await waitForService('http://otel-collector:8888/metrics', 'OpenTelemetry Collector');
+    await waitForService('http://otel-collector:13133/', 'OpenTelemetry Collector');
     await waitForService('http://jaeger:16686', 'Jaeger');
     await waitForService('http://prometheus:9090', 'Prometheus');
     
@@ -328,10 +328,10 @@ async function verifyTelemetry() {
       console.log('⚠️  No eval2otel metrics found yet (may take time to scrape)');
     }
 
-    // Check collector health
+    // Check collector metrics endpoint
     const collectorResponse = await axios.get('http://otel-collector:8888/metrics');
     if (collectorResponse.status === 200) {
-      console.log('✅ OpenTelemetry Collector is healthy');
+      console.log('✅ OpenTelemetry Collector metrics endpoint is working');
     }
 
   } catch (error) {
