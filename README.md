@@ -83,7 +83,7 @@ const evalResult: EvalResult = {
   },
   
   performance: {
-    duration: 1500, // milliseconds
+    duration: 1.5, // seconds
   },
 };
 
@@ -234,6 +234,8 @@ interface OtelConfig {
   environment?: string;          // Deployment environment
   captureContent?: boolean;      // Opt-in for sensitive content
   sampleContentRate?: number;    // Content sampling rate (0.0-1.0)
+  contentMaxLength?: number;     // Optional: truncate captured content (characters)
+  contentSampler?: (evalResult: EvalResult) => boolean; // Optional custom sampler
   redact?: (content: string) => string | null; // Custom redaction
   endpoint?: string;            // OpenTelemetry endpoint
   resourceAttributes?: Record<string, string | number | boolean>;
@@ -280,7 +282,7 @@ eval2otel follows OpenTelemetry GenAI semantic conventions. Here's how `EvalResu
 | `gen_ai.system.message` | System message | `content`, `role`, `index` |
 | `gen_ai.user.message` | User message | `content`, `role`, `index` |
 | `gen_ai.assistant.message` | Assistant response | `content`, `role`, `choice.index` |
-| `gen_ai.tool.message` | Tool call/result | `tool.name`, `tool.call_id`, `arguments` |
+| `gen_ai.tool.message` | Tool call/result | `gen_ai.tool.name`, `gen_ai.tool.call.id`, `gen_ai.tool.arguments`, `gen_ai.response.choice.index` |
 
 ### Metrics
 
@@ -293,6 +295,12 @@ eval2otel follows OpenTelemetry GenAI semantic conventions. Here's how `EvalResu
 | `eval.custom.metric` | Histogram | `1` | Custom quality metrics |
 
 All metrics include attributes for `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.system`, and `deployment.environment`.
+
+#### Units
+
+- Client and server durations are in seconds.
+- Agent step and validation durations are in milliseconds.
+- Ensure inputs match expected units to avoid skewed metrics.
 
 ## Privacy & Security
 
