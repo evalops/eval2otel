@@ -1,5 +1,6 @@
 import { SpanKind, SpanStatusCode, trace, Span, context } from '@opentelemetry/api';
 import { EvalResult, GenAIAttributes, OtelConfig, ProcessOptions, EvalResultSchema } from './types';
+import { ATTR } from './attributes';
 
 export class Eval2OtelConverter {
   private tracer;
@@ -47,23 +48,27 @@ export class Eval2OtelConverter {
       span.setStatus({ code: SpanStatusCode.OK });
     }
 
+    // Decide once per evaluation for performance
+    const captureContent = this.shouldCaptureContent(validated);
+    const emitOps = this.config.emitOperationalMetadata !== false;
+
     // Add conversation events if present and allowed
-    if (validated.conversation && this.shouldCaptureContent(validated) && (this.config.emitOperationalMetadata !== false)) {
+    if (validated.conversation && captureContent && emitOps) {
       this.addConversationEvents(span, validated);
     }
 
     // Add choice events for response if allowed
-    if (validated.response.choices && this.shouldCaptureContent(validated) && (this.config.emitOperationalMetadata !== false)) {
+    if (validated.response.choices && captureContent && emitOps) {
       this.addChoiceEvents(span, validated);
     }
 
     // Add agent step events if allowed
-    if (validated.agent?.steps && this.shouldCaptureContent(validated) && (this.config.emitOperationalMetadata !== false)) {
+    if (validated.agent?.steps && captureContent && emitOps) {
       this.addAgentStepEvents(span, validated);
     }
 
     // Add RAG chunk events if allowed
-    if (validated.rag?.chunks && this.shouldCaptureContent(validated) && (this.config.emitOperationalMetadata !== false)) {
+    if (validated.rag?.chunks && captureContent && emitOps) {
       this.addRAGChunkEvents(span, validated);
     }
 
@@ -315,8 +320,8 @@ export class Eval2OtelConverter {
       const eventName = `gen_ai.${message.role}.message`;
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
-        'gen_ai.message.role': message.role,
-        'gen_ai.message.index': index,
+        [ATTR.MESSAGE_ROLE]: message.role,
+        [ATTR.MESSAGE_INDEX]: index,
       };
 
       if (message.content) {
@@ -327,18 +332,18 @@ export class Eval2OtelConverter {
         if (redactedContent !== null) {
           const max = this.config.contentMaxLength;
           if (typeof max === 'number' && max > 0 && redactedContent.length > max) {
-            attributes['gen_ai.message.content'] = redactedContent.slice(0, max);
+            attributes[ATTR.MESSAGE_CONTENT] = redactedContent.slice(0, max);
             if (this.config.markTruncatedContent) {
-              attributes['gen_ai.message.content_truncated'] = true;
+              attributes[ATTR.MESSAGE_CONTENT_TRUNCATED] = true;
             }
           } else {
-            attributes['gen_ai.message.content'] = redactedContent;
+            attributes[ATTR.MESSAGE_CONTENT] = redactedContent;
           }
         }
       }
 
       if (message.toolCallId) {
-        attributes['gen_ai.tool.call.id'] = message.toolCallId;
+        attributes[ATTR.TOOL_CALL_ID] = message.toolCallId;
       }
 
       span.addEvent(eventName, attributes);
@@ -354,9 +359,9 @@ export class Eval2OtelConverter {
     evalResult.response.choices.forEach((choice) => {
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
-        'gen_ai.response.choice.index': choice.index,
-        'gen_ai.response.finish_reason': choice.finishReason,
-        'gen_ai.message.role': choice.message.role,
+        [ATTR.RESPONSE_CHOICE_INDEX]: choice.index,
+        [ATTR.RESPONSE_FINISH_REASON]: choice.finishReason,
+        [ATTR.MESSAGE_ROLE]: choice.message.role,
       };
 
       if (choice.message.content) {
@@ -367,12 +372,12 @@ export class Eval2OtelConverter {
         if (redactedContent !== null) {
           const max = this.config.contentMaxLength;
           if (typeof max === 'number' && max > 0 && redactedContent.length > max) {
-            attributes['gen_ai.message.content'] = redactedContent.slice(0, max);
+            attributes[ATTR.MESSAGE_CONTENT] = redactedContent.slice(0, max);
             if (this.config.markTruncatedContent) {
-              attributes['gen_ai.message.content_truncated'] = true;
+              attributes[ATTR.MESSAGE_CONTENT_TRUNCATED] = true;
             }
           } else {
-            attributes['gen_ai.message.content'] = redactedContent;
+            attributes[ATTR.MESSAGE_CONTENT] = redactedContent;
           }
         }
       }
@@ -380,14 +385,17 @@ export class Eval2OtelConverter {
       if (choice.message.toolCalls) {
         // Add tool call events separately for better structure
         choice.message.toolCalls.forEach((toolCall) => {
+          const rawArgs = typeof toolCall.function.arguments === 'string'
+            ? toolCall.function.arguments
+            : JSON.stringify(toolCall.function.arguments);
           span.addEvent('gen_ai.tool.message', {
             'gen_ai.system': evalResult.system ?? 'unknown',
-            'gen_ai.tool.name': toolCall.function.name,
-            'gen_ai.tool.call.id': toolCall.id,
-            'gen_ai.response.choice.index': choice.index,
-            'gen_ai.tool.arguments': this.truncateContent(
+            [ATTR.TOOL_NAME]: toolCall.function.name,
+            [ATTR.TOOL_CALL_ID]: toolCall.id,
+            [ATTR.RESPONSE_CHOICE_INDEX]: choice.index,
+            [ATTR.TOOL_ARGUMENTS]: this.truncateContent(
               this.redactToolArguments(
-                JSON.stringify(toolCall.function.arguments),
+                rawArgs,
                 toolCall.function.name,
                 toolCall.id
               ) ?? '{}'
