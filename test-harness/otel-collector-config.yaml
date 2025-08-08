@@ -14,7 +14,7 @@ exporters:
     verbosity: detailed
   
   prometheus:
-    endpoint: "0.0.0.0:8890"
+    endpoint: "0.0.0.0:8888"
 
 service:
   pipelines:
