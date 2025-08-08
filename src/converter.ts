@@ -330,14 +330,13 @@ export class Eval2OtelConverter {
 
       if (choice.message.toolCalls) {
         // Add tool call events separately for better structure
-        choice.message.toolCalls.forEach((toolCall, index) => {
+        choice.message.toolCalls.forEach((toolCall) => {
           span.addEvent('gen_ai.tool.message', {
             'gen_ai.system': evalResult.system ?? 'unknown',
-            'tool.name': toolCall.function.name,
-            'tool.call_id': toolCall.id,
-            'choice.index': choice.index,
-            index,
-            arguments: this.redactContent(JSON.stringify(toolCall.function.arguments)) ?? '{}',
+            'gen_ai.tool.name': toolCall.function.name,
+            'gen_ai.tool.call.id': toolCall.id,
+            'gen_ai.response.choice.index': choice.index,
+            'gen_ai.tool.arguments': this.redactContent(JSON.stringify(toolCall.function.arguments)) ?? '{}',
           });
         });
       }
