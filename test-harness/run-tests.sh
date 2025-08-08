@@ -5,11 +5,11 @@ echo "======================================="
 
 # Clean up any existing containers
 echo "🧹 Cleaning up existing containers..."
-docker-compose down -v --remove-orphans
+docker compose down -v --remove-orphans
 
 # Build and start services
 echo "🚀 Starting OpenTelemetry infrastructure..."
-docker-compose up -d otel-collector jaeger prometheus
+docker compose up -d otel-collector jaeger prometheus
 
 # Wait for infrastructure to be ready
 echo "⏳ Waiting for infrastructure to start..."
@@ -17,7 +17,7 @@ sleep 10
 
 # Run the test
 echo "🧪 Running eval2otel tests..."
-docker-compose run --rm test-runner
+docker compose run --rm test-runner
 
 TEST_EXIT_CODE=$?
 
@@ -36,18 +36,18 @@ if [ $TEST_EXIT_CODE -eq 0 ]; then
     
     # Keep services running for inspection
     echo "🔄 Keeping services running for inspection..."
-    echo "   Run 'docker-compose down' to stop all services."
+    echo "   Run 'docker compose down' to stop all services."
     
     # Wait for user interrupt
-    trap 'echo ""; echo "🛑 Stopping services..."; docker-compose down; exit 0' INT
+    trap 'echo ""; echo "🛑 Stopping services..."; docker compose down; exit 0' INT
     
     # Show live logs
     echo "📋 Live logs (Ctrl+C to stop):"
-    docker-compose logs -f
+    docker compose logs -f
 else
     echo ""
     echo "❌ Tests failed! Check the logs above."
     echo "🛑 Stopping services..."
-    docker-compose down
+    docker compose down
     exit $TEST_EXIT_CODE
 fi

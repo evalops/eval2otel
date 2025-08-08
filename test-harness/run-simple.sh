@@ -5,11 +5,11 @@ echo "=================================================="
 
 # Clean up any existing containers
 echo "🧹 Cleaning up existing containers..."
-docker-compose -f docker-compose-simple.yml down -v --remove-orphans
+docker compose -f docker-compose-simple.yml down -v --remove-orphans
 
 # Start services
 echo "🚀 Starting OpenTelemetry infrastructure..."
-docker-compose -f docker-compose-simple.yml up -d
+docker compose -f docker-compose-simple.yml up -d
 
 # Wait for infrastructure to be ready
 echo "⏳ Waiting for infrastructure to start..."
@@ -47,18 +47,18 @@ if [ $TEST_EXIT_CODE -eq 0 ]; then
     
     # Keep services running for inspection
     echo "🔄 Keeping services running for inspection..."
-    echo "   Run 'docker-compose -f docker-compose-simple.yml down' to stop all services."
+    echo "   Run 'docker compose -f docker-compose-simple.yml down' to stop all services."
     
     # Wait for user interrupt
-    trap 'echo ""; echo "🛑 Stopping services..."; docker-compose -f docker-compose-simple.yml down; exit 0' INT
+    trap 'echo ""; echo "🛑 Stopping services..."; docker compose -f docker-compose-simple.yml down; exit 0' INT
     
     # Show live logs
     echo "📋 Live logs (Ctrl+C to stop):"
-    docker-compose -f docker-compose-simple.yml logs -f
+    docker compose -f docker-compose-simple.yml logs -f
 else
     echo ""
     echo "❌ Tests failed! Check the logs above."
     echo "🛑 Stopping services..."
-    docker-compose -f docker-compose-simple.yml down
+    docker compose -f docker-compose-simple.yml down
     exit $TEST_EXIT_CODE
 fi
