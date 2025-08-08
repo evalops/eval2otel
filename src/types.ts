@@ -159,6 +159,9 @@ export interface OtelConfig {
   /** Optional maximum length for captured content (characters). If unset, no truncation. */
   contentMaxLength?: number;
   
+  /** Optional sampler to decide if content should be captured for a given evaluation. */
+  contentSampler?: (evalResult: EvalResult) => boolean;
+  
   /** Redaction function for sensitive content */
   redact?: (content: string) => string | null;
   

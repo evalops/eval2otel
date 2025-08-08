@@ -48,22 +48,22 @@ export class Eval2OtelConverter {
     }
 
     // Add conversation events if present and content capture is enabled
-    if (validated.conversation && this.shouldCaptureContent()) {
+    if (validated.conversation && this.shouldCaptureContent(validated)) {
       this.addConversationEvents(span, validated);
     }
 
     // Add choice events for response
-    if (validated.response.choices && this.shouldCaptureContent()) {
+    if (validated.response.choices && this.shouldCaptureContent(validated)) {
       this.addChoiceEvents(span, validated);
     }
 
     // Add agent step events
-    if (validated.agent?.steps && this.shouldCaptureContent()) {
+    if (validated.agent?.steps && this.shouldCaptureContent(validated)) {
       this.addAgentStepEvents(span, validated);
     }
 
     // Add RAG chunk events
-    if (validated.rag?.chunks && this.shouldCaptureContent()) {
+    if (validated.rag?.chunks && this.shouldCaptureContent(validated)) {
       this.addRAGChunkEvents(span, validated);
     }
 
@@ -94,11 +94,23 @@ export class Eval2OtelConverter {
   /**
    * Determine if content should be captured based on config and sampling
    */
-  private shouldCaptureContent(): boolean {
+  private shouldCaptureContent(evalResult: EvalResult): boolean {
     if (!this.config.captureContent) return false;
     
+    if (this.config.contentSampler) {
+      return this.config.contentSampler(evalResult);
+    }
     const sampleRate = this.config.sampleContentRate ?? 1.0;
-    return Math.random() <= sampleRate;
+    if (sampleRate >= 1.0) return true;
+    if (sampleRate <= 0) return false;
+    const id = String(evalResult.id ?? '');
+    let hash = 5381;
+    for (let i = 0; i < id.length; i++) {
+      hash = ((hash << 5) + hash) + id.charCodeAt(i);
+      hash |= 0;
+    }
+    const norm = (hash >>> 0) / 4294967296;
+    return norm <= sampleRate;
   }
 
   /**
