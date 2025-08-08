@@ -10,7 +10,26 @@
       "mcp__github__create_issue",
       "Bash(gh issue create:*)",
       "Bash(npx tsc:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(docker compose:*)",
+      "Bash(npm pack:*)",
+      "Bash(grep:*)",
+      "Bash(curl:*)",
+      "Bash(docker kill:*)",
+      "Bash(docker rm:*)",
+      "Bash(bash:*)",
+      "Bash(timeout 30s docker compose up otel-collector)",
+      "Bash(lsof:*)",
+      "Bash(timeout 15s docker compose up otel-collector)",
+      "Bash(docker run:*)",
+      "Bash(docker:*)",
+      "Bash(gh run watch:*)",
+      "Bash(git tag:*)",
+      "Bash(chmod:*)",
+      "Bash(RUN_OLLAMA=true timeout 60s bash run-tests.sh)",
+      "Bash(RUN_OLLAMA=true bash run-tests.sh)"
     ],
     "deny": []
   }

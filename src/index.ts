@@ -188,6 +188,14 @@ export {
   createValidationWrapper 
 } from './validation';
 export { ATTR } from './attributes';
+export { 
+  convertOllamaToEval2Otel, 
+  convertOpenAICompatibleToEval2Otel,
+  type OllamaResponse,
+  type OllamaRequest,
+  type OllamaConversionOptions,
+  type OpenAICompatibleResponse
+} from './providers';
 
 // Convenience function for quick setup
 export function createEval2Otel(config: OtelConfig): Eval2Otel {

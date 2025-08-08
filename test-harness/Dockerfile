@@ -18,6 +18,7 @@ COPY package.json node_modules/eval2otel/package.json
 
 COPY test-harness/test-e2e.js .
 COPY test-harness/verify-telemetry.js .
+COPY test-harness/ollama-examples.js .
 
 # Verify eval2otel can be required (optional check)
 RUN node -e "const { createEval2Otel } = require('eval2otel'); console.log('✅ eval2otel module loaded successfully');"
