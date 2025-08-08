@@ -47,7 +47,8 @@ export class Eval2Otel {
       });
     }
 
-    const resource = new Resource(resourceAttributes);
+    // Merge with default resource to preserve host/runtime attrs
+    const resource = Resource.default().merge(new Resource(resourceAttributes));
 
     const sdkConfig = {
       resource,
@@ -56,8 +57,16 @@ export class Eval2Otel {
 
     // Add endpoint configuration if provided
     if (this.config.endpoint) {
-      // Configure OTLP exporter endpoint
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT = this.config.endpoint;
+    }
+    if (this.config.exporterProtocol) {
+      process.env.OTEL_EXPORTER_OTLP_PROTOCOL = this.config.exporterProtocol;
+    }
+    if (this.config.exporterHeaders && Object.keys(this.config.exporterHeaders).length > 0) {
+      // Join as k=v pairs separated by commas per OTLP env format
+      process.env.OTEL_EXPORTER_OTLP_HEADERS = Object.entries(this.config.exporterHeaders)
+        .map(([k, v]) => `${k}=${String(v)}`)
+        .join(',');
     }
 
     this.sdk = new NodeSDK(sdkConfig);

@@ -177,6 +177,12 @@ export interface OtelConfig {
   /** OTLP endpoint */
   endpoint?: string;
   
+  /** OTLP exporter protocol (grpc | http/protobuf | http/json) */
+  exporterProtocol?: 'grpc' | 'http/protobuf' | 'http/json';
+  
+  /** OTLP exporter headers (e.g., authentication) */
+  exporterHeaders?: Record<string, string>;
+  
   /** Custom resource attributes */
   resourceAttributes?: Record<string, string | number | boolean>;
 }

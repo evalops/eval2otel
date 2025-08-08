@@ -239,6 +239,8 @@ interface OtelConfig {
   emitOperationalMetadata?: boolean; // Suppress conversation/choice/agent/RAG events when false (default true)
   redact?: (content: string) => string | null; // Custom redaction
   endpoint?: string;            // OpenTelemetry endpoint
+  exporterProtocol?: 'grpc' | 'http/protobuf' | 'http/json'; // OTLP protocol
+  exporterHeaders?: Record<string, string>; // OTLP headers (e.g., auth)
   resourceAttributes?: Record<string, string | number | boolean>;
 }
 ```
