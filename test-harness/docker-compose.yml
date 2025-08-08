@@ -10,10 +10,7 @@ services:
     ports:
       - "4317:4317"   # OTLP gRPC receiver
       - "4318:4318"   # OTLP HTTP receiver
-      - "8889:8888"   # Prometheus metrics (using 8889 to avoid conflicts)
-    depends_on:
-      - jaeger
-      - prometheus
+      - "8887:8888"   # Prometheus metrics (using 8887 to avoid conflicts)
 
   # Jaeger for traces
   jaeger:
