@@ -47,23 +47,23 @@ export class Eval2OtelConverter {
       span.setStatus({ code: SpanStatusCode.OK });
     }
 
-    // Add conversation events if present and content capture is enabled
-    if (validated.conversation && this.shouldCaptureContent(validated)) {
+    // Add conversation events if present and allowed
+    if (validated.conversation && this.shouldCaptureContent(validated) && (this.config.emitOperationalMetadata !== false)) {
       this.addConversationEvents(span, validated);
     }
 
-    // Add choice events for response
-    if (validated.response.choices && this.shouldCaptureContent(validated)) {
+    // Add choice events for response if allowed
+    if (validated.response.choices && this.shouldCaptureContent(validated) && (this.config.emitOperationalMetadata !== false)) {
       this.addChoiceEvents(span, validated);
     }
 
-    // Add agent step events
-    if (validated.agent?.steps && this.shouldCaptureContent(validated)) {
+    // Add agent step events if allowed
+    if (validated.agent?.steps && this.shouldCaptureContent(validated) && (this.config.emitOperationalMetadata !== false)) {
       this.addAgentStepEvents(span, validated);
     }
 
-    // Add RAG chunk events
-    if (validated.rag?.chunks && this.shouldCaptureContent(validated)) {
+    // Add RAG chunk events if allowed
+    if (validated.rag?.chunks && this.shouldCaptureContent(validated) && (this.config.emitOperationalMetadata !== false)) {
       this.addRAGChunkEvents(span, validated);
     }
 
