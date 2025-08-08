@@ -7,21 +7,61 @@ console.log('🚀 Starting eval2otel E2E Test Suite\n');
 async function waitForService(url, name, maxRetries = 30) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      await axios.get(url);
+      await axios.get(url, { timeout: 5000 });
       console.log(`✅ ${name} is ready`);
       return;
     } catch (error) {
-      console.log(`⏳ Waiting for ${name}... (${i + 1}/${maxRetries})`);
+      console.log(`⏳ Waiting for ${name}... (${i + 1}/${maxRetries}) - ${error.code || error.message}`);
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
   throw new Error(`❌ ${name} failed to start`);
 }
 
+// Wait for TCP port to be open
+async function waitForPort(host, port, name, maxRetries = 30) {
+  const net = require('net');
+  
+  for (let i = 0; i < maxRetries; i++) {
+    const isOpen = await new Promise((resolve) => {
+      const socket = new net.Socket();
+      socket.setTimeout(2000);
+      
+      socket.on('connect', () => {
+        socket.destroy();
+        resolve(true);
+      });
+      
+      socket.on('timeout', () => {
+        socket.destroy();
+        resolve(false);
+      });
+      
+      socket.on('error', () => {
+        resolve(false);
+      });
+      
+      socket.connect(port, host);
+    });
+    
+    if (isOpen) {
+      console.log(`✅ ${name} port ${port} is open`);
+      return;
+    }
+    
+    console.log(`⏳ Waiting for ${name} port ${port}... (${i + 1}/${maxRetries})`);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  throw new Error(`❌ ${name} port ${port} failed to open`);
+}
+
 async function runTests() {
   try {
-    // Wait for services
-    await waitForService('http://otel-collector:13133/', 'OpenTelemetry Collector');
+    // Wait for collector ports to be open first
+    await waitForPort('otel-collector', 4317, 'OpenTelemetry Collector gRPC', 20);
+    await waitForPort('otel-collector', 8888, 'OpenTelemetry Collector Prometheus', 20);
+    
+    // Wait for HTTP services
     await waitForService('http://jaeger:16686', 'Jaeger');
     await waitForService('http://prometheus:9090', 'Prometheus');
     
