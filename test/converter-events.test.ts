@@ -76,7 +76,7 @@ describe('Converter events', () => {
 
     const assistantEvent = span.events.find((e) => e.name === 'gen_ai.assistant.message');
     expect(assistantEvent).toBeDefined();
-    const msgContent = String(assistantEvent!.attributes['message.content']);
+    const msgContent = String(assistantEvent!.attributes['gen_ai.message.content']);
     expect(msgContent.length).toBeLessThanOrEqual(10);
   });
 
@@ -172,7 +172,7 @@ describe('Converter events', () => {
     converter.convertEvalResult(evalResult);
     const span = fakeTracer.lastSpan!;
     const assistantEvent = span.events.find((e) => e.name === 'gen_ai.assistant.message');
-    expect(assistantEvent!.attributes['message.content']).toBe('[REDACTED]');
+    expect(assistantEvent!.attributes['gen_ai.message.content']).toBe('[REDACTED]');
     const toolEvent = span.events.find((e) => e.name === 'gen_ai.tool.message');
     expect(toolEvent!.attributes['gen_ai.tool.arguments']).toBe('[ARGS]');
   });
