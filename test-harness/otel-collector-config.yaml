@@ -12,9 +12,6 @@ processors:
 exporters:
   debug:
     verbosity: detailed
-  
-  logging:
-    loglevel: info
 
 service:
   pipelines:
@@ -26,7 +23,7 @@ service:
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging, debug]
+      exporters: [debug]
     
     logs:
       receivers: [otlp]
