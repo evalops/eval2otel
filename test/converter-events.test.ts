@@ -104,6 +104,32 @@ describe('Converter events', () => {
     expect(span.events.length).toBe(0);
   });
 
+  it('suppresses operational metadata when emitOperationalMetadata=false', () => {
+    const fakeTracer = new FakeTracer();
+    jest.spyOn(trace, 'getTracer').mockReturnValue(fakeTracer as any);
+    const converter = new Eval2OtelConverter({
+      serviceName: 'svc',
+      captureContent: true,
+      contentSampler: () => true,
+      emitOperationalMetadata: false,
+    });
+    const evalResult: EvalResult = {
+      id: 'id4',
+      timestamp: Date.now(),
+      model: 'gpt-4',
+      system: 'openai',
+      operation: 'chat',
+      request: { model: 'gpt-4' },
+      conversation: { id: 'c1', messages: [{ role: 'user', content: 'hi' }] },
+      response: { choices: [{ index: 0, finishReason: 'stop', message: { role: 'assistant', content: 'hey' } }] },
+      usage: {},
+      performance: { duration: 1 },
+    } as any;
+    converter.convertEvalResult(evalResult);
+    const span = fakeTracer.lastSpan!;
+    expect(span.events.length).toBe(0);
+  });
+
   it('applies per-field redaction hooks', () => {
     const fakeTracer = new FakeTracer();
     jest.spyOn(trace, 'getTracer').mockReturnValue(fakeTracer as any);
@@ -151,4 +177,3 @@ describe('Converter events', () => {
     expect(toolEvent!.attributes['gen_ai.tool.arguments']).toBe('[ARGS]');
   });
 });
-

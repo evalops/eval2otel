@@ -236,6 +236,7 @@ interface OtelConfig {
   sampleContentRate?: number;    // Content sampling rate (0.0-1.0)
   contentMaxLength?: number;     // Optional: truncate captured content (characters)
   contentSampler?: (evalResult: EvalResult) => boolean; // Optional custom sampler
+  emitOperationalMetadata?: boolean; // Suppress conversation/choice/agent/RAG events when false (default true)
   redact?: (content: string) => string | null; // Custom redaction
   endpoint?: string;            // OpenTelemetry endpoint
   resourceAttributes?: Record<string, string | number | boolean>;

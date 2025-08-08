@@ -161,6 +161,9 @@ export interface OtelConfig {
   
   /** Optional sampler to decide if content should be captured for a given evaluation. */
   contentSampler?: (evalResult: EvalResult) => boolean;
+
+  /** Whether to emit operational metadata events (conversation, choices, agent, RAG). Default: true */
+  emitOperationalMetadata?: boolean;
   
   /** Redaction function for sensitive content */
   redact?: (content: string) => string | null;
