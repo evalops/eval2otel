@@ -6,13 +6,12 @@ WORKDIR /app
 RUN npm init -y && \
     npm install axios
 
-# Create a proper eval2otel package structure
-COPY package.json eval2otel-package.json
+# Copy built dist files directly
 COPY dist/ ./dist/
 
-# Create eval2otel as a local package and install it
+# Create a minimal eval2otel package.json without build scripts
 RUN mkdir -p /tmp/eval2otel && \
-    cp eval2otel-package.json /tmp/eval2otel/package.json && \
+    echo '{"name":"eval2otel","version":"0.3.0","main":"index.js","types":"index.d.ts"}' > /tmp/eval2otel/package.json && \
     cp -r dist/* /tmp/eval2otel/ && \
     cd /tmp/eval2otel && \
     npm pack && \
