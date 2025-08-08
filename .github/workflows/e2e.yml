@@ -1,0 +1,35 @@
+name: E2E (optional)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *' # daily @ 06:00 UTC
+  push:
+    branches: [ main ]
+
+jobs:
+  e2e:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run E2E test-harness
+        env:
+          OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+        run: |
+          bash test-harness/run-tests.sh
+
