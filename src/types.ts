@@ -165,6 +165,12 @@ export interface OtelConfig {
   /** Redaction function for sensitive content */
   redact?: (content: string) => string | null;
   
+  /** Optional redaction hook for message content with role context */
+  redactMessageContent?: (content: string, info: { role: string }) => string | null;
+
+  /** Optional redaction hook for tool arguments with function context */
+  redactToolArguments?: (argsJson: string, info: { functionName: string; callId?: string }) => string | null;
+  
   /** OTLP endpoint */
   endpoint?: string;
   

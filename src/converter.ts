@@ -113,14 +113,26 @@ export class Eval2OtelConverter {
     return norm <= sampleRate;
   }
 
-  /**
-   * Apply redaction if configured
-   */
-  private redactContent(content: string): string | null {
-    if (this.config.redact) {
-      return this.config.redact(content);
-    }
+  /** Apply general redaction if configured */
+  private redact(content: string): string | null {
+    if (this.config.redact) return this.config.redact(content);
     return content;
+  }
+
+  /** Redact message content with role-aware hook if provided */
+  private redactMessageContent(content: string, role: string): string | null {
+    if (this.config.redactMessageContent) {
+      return this.config.redactMessageContent(content, { role });
+    }
+    return this.redact(content);
+  }
+
+  /** Redact tool arguments with function-aware hook if provided */
+  private redactToolArguments(argsJson: string, functionName: string, callId?: string): string | null {
+    if (this.config.redactToolArguments) {
+      return this.config.redactToolArguments(argsJson, { functionName, callId });
+    }
+    return this.redact(argsJson);
   }
 
   /**
@@ -312,7 +324,7 @@ export class Eval2OtelConverter {
           ? message.content 
           : JSON.stringify(message.content);
         
-        const redactedContent = this.redactContent(contentStr);
+        const redactedContent = this.redactMessageContent(contentStr, message.role);
         if (redactedContent !== null) {
           attributes.content = redactedContent;
         }
@@ -345,7 +357,7 @@ export class Eval2OtelConverter {
           ? choice.message.content
           : JSON.stringify(choice.message.content);
         
-        const redactedContent = this.redactContent(contentStr);
+        const redactedContent = this.redactMessageContent(contentStr, choice.message.role);
         if (redactedContent !== null) {
           attributes['message.content'] = this.truncateContent(redactedContent);
         }
@@ -359,7 +371,13 @@ export class Eval2OtelConverter {
             'gen_ai.tool.name': toolCall.function.name,
             'gen_ai.tool.call.id': toolCall.id,
             'gen_ai.response.choice.index': choice.index,
-            'gen_ai.tool.arguments': this.truncateContent(this.redactContent(JSON.stringify(toolCall.function.arguments)) ?? '{}'),
+            'gen_ai.tool.arguments': this.truncateContent(
+              this.redactToolArguments(
+                JSON.stringify(toolCall.function.arguments),
+                toolCall.function.name,
+                toolCall.id
+              ) ?? '{}'
+            ),
           });
         });
       }
