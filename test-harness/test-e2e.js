@@ -180,7 +180,7 @@ async function runTests() {
           finishReason: 'tool_calls',
           message: {
             role: 'assistant',
-            content: null,
+            content: '',
             toolCalls: [{
               id: 'call_123',
               type: 'function',
