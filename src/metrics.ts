@@ -24,6 +24,11 @@ export class Eval2OtelMetrics {
   // Agent metrics
   private agentStepDurationHistogram!: Histogram;
   private agentTotalStepsHistogram!: Histogram;
+  
+  // Validation metrics
+  private validationSuccessRateHistogram!: Histogram;
+  private validationRetryCountHistogram!: Histogram;
+  private validationDurationHistogram!: Histogram;
 
   constructor(config: OtelConfig) {
     this.config = config;
@@ -95,6 +100,22 @@ export class Eval2OtelMetrics {
     this.agentTotalStepsHistogram = this.meter.createHistogram('gen_ai.agent.total_steps', {
       description: 'Total number of steps in agent execution',
       unit: '{step}',
+    });
+    
+    // Validation metrics
+    this.validationSuccessRateHistogram = this.meter.createHistogram('gen_ai.validation.success_rate', {
+      description: 'Rate of successful schema validations',
+      unit: '1',
+    });
+    
+    this.validationRetryCountHistogram = this.meter.createHistogram('gen_ai.validation.retry_count', {
+      description: 'Number of retries needed for validation',
+      unit: '{retry}',
+    });
+    
+    this.validationDurationHistogram = this.meter.createHistogram('gen_ai.validation.duration', {
+      description: 'Time taken for validation including retries',
+      unit: 'ms',
     });
   }
 

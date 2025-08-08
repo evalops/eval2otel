@@ -145,6 +145,13 @@ export class Eval2Otel {
 export { EvalResult, OtelConfig, GenAIAttributes, ProcessOptions } from './types';
 export { Eval2OtelConverter } from './converter';
 export { Eval2OtelMetrics } from './metrics';
+export { 
+  Eval2OtelValidation, 
+  ValidationResult, 
+  ValidationConfig,
+  CommonSchemas,
+  createValidationWrapper 
+} from './validation';
 
 // Convenience function for quick setup
 export function createEval2Otel(config: OtelConfig): Eval2Otel {
