@@ -35,19 +35,28 @@ echo "   Collector:    http://localhost:8889/metrics"
 if [ $TEST_EXIT_CODE -eq 0 ]; then
     echo ""
     echo "✅ All tests passed! You can inspect the telemetry data at the URLs above."
-    echo "   Press Ctrl+C when you're done exploring."
-    echo ""
     
-    # Keep services running for inspection
-    echo "🔄 Keeping services running for inspection..."
-    echo "   Run 'docker compose down' to stop all services."
-    
-    # Wait for user interrupt
-    trap 'echo ""; echo "🛑 Stopping services..."; docker compose down; exit 0' INT
-    
-    # Show live logs
-    echo "📋 Live logs (Ctrl+C to stop):"
-    docker compose logs -f
+    # Check if running in CI (GitHub Actions sets CI=true)
+    if [ "$CI" = "true" ]; then
+        echo "🔄 CI environment detected - stopping services and exiting cleanly."
+        echo "🛑 Stopping services..."
+        docker compose down
+        exit 0
+    else
+        echo "   Press Ctrl+C when you're done exploring."
+        echo ""
+        
+        # Keep services running for inspection (local development only)
+        echo "🔄 Keeping services running for inspection..."
+        echo "   Run 'docker compose down' to stop all services."
+        
+        # Wait for user interrupt
+        trap 'echo ""; echo "🛑 Stopping services..."; docker compose down; exit 0' INT
+        
+        # Show live logs
+        echo "📋 Live logs (Ctrl+C to stop):"
+        docker compose logs -f
+    fi
 else
     echo ""
     echo "❌ Tests failed! Check the logs above."
