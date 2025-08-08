@@ -2,10 +2,13 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install eval2otel and test dependencies
+# Create package.json for test dependencies
 RUN npm init -y && \
-    npm install eval2otel@0.2.0 axios && \
-    npm install --save-dev typescript @types/node
+    npm install axios
+
+# Copy built eval2otel dist files
+COPY ../dist ./node_modules/eval2otel/dist/
+COPY ../package.json ./node_modules/eval2otel/package.json
 
 COPY test-e2e.js .
 COPY verify-telemetry.js .
