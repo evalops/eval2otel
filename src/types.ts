@@ -156,6 +156,9 @@ export interface OtelConfig {
   /** Rate of content sampling (0.0 to 1.0, default: 1.0) */
   sampleContentRate?: number;
   
+  /** Optional maximum length for captured content (characters). If unset, no truncation. */
+  contentMaxLength?: number;
+  
   /** Redaction function for sensitive content */
   redact?: (content: string) => string | null;
   
