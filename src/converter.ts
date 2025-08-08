@@ -112,6 +112,17 @@ export class Eval2OtelConverter {
   }
 
   /**
+   * Truncate content if a max length is configured
+   */
+  private truncateContent(content: string): string {
+    const max = this.config.contentMaxLength;
+    if (typeof max === 'number' && max > 0 && content.length > max) {
+      return content.slice(0, max);
+    }
+    return content;
+  }
+
+  /**
    * Build OpenTelemetry span attributes from eval result
    */
   private buildSpanAttributes(
@@ -324,7 +335,7 @@ export class Eval2OtelConverter {
         
         const redactedContent = this.redactContent(contentStr);
         if (redactedContent !== null) {
-          attributes['message.content'] = redactedContent;
+          attributes['message.content'] = this.truncateContent(redactedContent);
         }
       }
 
@@ -336,7 +347,7 @@ export class Eval2OtelConverter {
             'gen_ai.tool.name': toolCall.function.name,
             'gen_ai.tool.call.id': toolCall.id,
             'gen_ai.response.choice.index': choice.index,
-            'gen_ai.tool.arguments': this.redactContent(JSON.stringify(toolCall.function.arguments)) ?? '{}',
+            'gen_ai.tool.arguments': this.truncateContent(this.redactContent(JSON.stringify(toolCall.function.arguments)) ?? '{}'),
           });
         });
       }
