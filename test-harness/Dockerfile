@@ -6,19 +6,24 @@ WORKDIR /app
 RUN npm init -y && \
     npm install axios
 
-# Copy built dist files directly
-COPY dist/ ./dist/
-
-# Create a minimal eval2otel package.json without build scripts
-RUN mkdir -p /tmp/eval2otel && \
-    echo '{"name":"eval2otel","version":"0.3.0","main":"index.js","types":"index.d.ts"}' > /tmp/eval2otel/package.json && \
-    cp -r dist/* /tmp/eval2otel/ && \
-    cd /tmp/eval2otel && \
-    npm pack && \
-    cd /app && \
-    npm install /tmp/eval2otel/eval2otel-0.3.0.tgz
+# Create proper eval2otel module directory structure  
+RUN mkdir -p node_modules/eval2otel/dist
+COPY dist/ node_modules/eval2otel/dist/
+COPY package.json node_modules/eval2otel/package.json
 
 COPY test-harness/test-e2e.js .
 COPY test-harness/verify-telemetry.js .
+
+# Debug: list node_modules structure
+RUN echo "=== DEBUG: node_modules structure ===" && \
+    ls -la node_modules/ && \
+    echo "=== eval2otel directory ===" && \
+    ls -la node_modules/eval2otel/ && \
+    echo "=== eval2otel/dist directory ===" && \
+    ls -la node_modules/eval2otel/dist/ && \
+    echo "=== package.json contents ===" && \
+    cat node_modules/eval2otel/package.json && \
+    echo "=== test if require works ===" && \
+    node -e "try { const m = require('eval2otel'); console.log('SUCCESS: eval2otel loaded'); console.log('Exports:', Object.keys(m)); } catch(e) { console.log('ERROR:', e.message); }"
 
 CMD ["node", "test-e2e.js"]
