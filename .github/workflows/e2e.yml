@@ -31,5 +31,6 @@ jobs:
         env:
           OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
         run: |
-          bash test-harness/run-tests.sh
+          cd test-harness
+          bash run-tests.sh
 
