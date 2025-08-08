@@ -315,8 +315,8 @@ export class Eval2OtelConverter {
       const eventName = `gen_ai.${message.role}.message`;
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
-        role: message.role,
-        index,
+        'gen_ai.message.role': message.role,
+        'gen_ai.message.index': index,
       };
 
       if (message.content) {
@@ -326,12 +326,12 @@ export class Eval2OtelConverter {
         
         const redactedContent = this.redactMessageContent(contentStr, message.role);
         if (redactedContent !== null) {
-          attributes.content = redactedContent;
+          attributes['gen_ai.message.content'] = redactedContent;
         }
       }
 
       if (message.toolCallId) {
-        attributes['tool.call_id'] = message.toolCallId;
+        attributes['gen_ai.tool.call.id'] = message.toolCallId;
       }
 
       span.addEvent(eventName, attributes);
@@ -347,9 +347,9 @@ export class Eval2OtelConverter {
     evalResult.response.choices.forEach((choice) => {
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
-        'choice.index': choice.index,
-        'choice.finish_reason': choice.finishReason,
-        'message.role': choice.message.role,
+        'gen_ai.response.choice.index': choice.index,
+        'gen_ai.response.finish_reason': choice.finishReason,
+        'gen_ai.message.role': choice.message.role,
       };
 
       if (choice.message.content) {
@@ -359,7 +359,7 @@ export class Eval2OtelConverter {
         
         const redactedContent = this.redactMessageContent(contentStr, choice.message.role);
         if (redactedContent !== null) {
-          attributes['message.content'] = this.truncateContent(redactedContent);
+          attributes['gen_ai.message.content'] = this.truncateContent(redactedContent);
         }
       }
 
