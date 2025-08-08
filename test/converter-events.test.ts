@@ -28,6 +28,7 @@ describe('Converter events', () => {
       serviceName: 'svc',
       captureContent: true,
       contentMaxLength: 10,
+      markTruncatedContent: true,
       contentSampler: () => true,
     });
 
@@ -78,6 +79,7 @@ describe('Converter events', () => {
     expect(assistantEvent).toBeDefined();
     const msgContent = String(assistantEvent!.attributes['gen_ai.message.content']);
     expect(msgContent.length).toBeLessThanOrEqual(10);
+    expect(assistantEvent!.attributes['gen_ai.message.content_truncated']).toBe(true);
   });
 
   it('skips content events when sampler returns false', () => {
