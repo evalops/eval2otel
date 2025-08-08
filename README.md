@@ -243,6 +243,13 @@ interface OtelConfig {
   endpoint?: string;            // OpenTelemetry endpoint
   exporterProtocol?: 'grpc' | 'http/protobuf' | 'http/json'; // OTLP protocol
   exporterHeaders?: Record<string, string>; // OTLP headers (e.g., auth)
+  // Per-signal OTLP overrides
+  tracesEndpoint?: string;
+  metricsEndpoint?: string;
+  logsEndpoint?: string;
+  tracesHeaders?: Record<string, string>;
+  metricsHeaders?: Record<string, string>;
+  logsHeaders?: Record<string, string>;
   resourceAttributes?: Record<string, string | number | boolean>;
 }
 
@@ -253,6 +260,40 @@ interface OtelConfig {
   - Assistant: `gen_ai.response.choice.index`, `gen_ai.response.finish_reason`, `gen_ai.message.role`, `gen_ai.message.content`.
 - New options: `emitOperationalMetadata`, `contentMaxLength`, `markTruncatedContent`, `contentSampler`, `redactMessageContent`, `redactToolArguments`.
 - Units: `performance.duration` is in seconds; `agent.step.duration` remains in milliseconds. Update any examples or integrations accordingly.
+
+## Using Attribute Constants
+
+For convenience and to avoid typos, the package exports `ATTR` constants for common event attributes:
+
+```ts
+import { ATTR } from 'eval2otel';
+
+// Example usage when inspecting events
+event.attributes[ATTR.MESSAGE_CONTENT];
+event.attributes[ATTR.RESPONSE_CHOICE_INDEX];
+event.attributes[ATTR.TOOL_ARGUMENTS];
+```
+
+## Signal-specific OTLP Config
+
+You can override endpoints and headers per signal while keeping a global default:
+
+```ts
+createEval2Otel({
+  serviceName: 'my-app',
+  endpoint: 'https://otlp.example.com', // global
+  exporterProtocol: 'http/protobuf',
+  exporterHeaders: { Authorization: 'Bearer global' },
+
+  // Per-signal overrides
+  tracesEndpoint: 'https://otlp.example.com/v1/traces',
+  metricsEndpoint: 'https://otlp.example.com/v1/metrics',
+  logsEndpoint: 'https://otlp.example.com/v1/logs',
+  tracesHeaders: { Authorization: 'Bearer traces' },
+  metricsHeaders: { Authorization: 'Bearer metrics' },
+  logsHeaders: { Authorization: 'Bearer logs' },
+});
+```
 ```
 
 ## OpenTelemetry Mapping
