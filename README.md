@@ -372,6 +372,21 @@ const eval2otel = createEval2Otel({
 });
 ```
 
+### Additional Privacy Controls
+
+```typescript
+const eval2otel = createEval2Otel({
+  serviceName: 'my-service',
+  captureContent: true,           // opt-in
+  emitOperationalMetadata: false, // suppress conversation/choice/agent/RAG events
+  contentMaxLength: 4096,         // truncate captured content
+  markTruncatedContent: true,     // add gen_ai.message.content_truncated when applied
+  contentSampler: (evalResult) => evalResult.operation !== 'embeddings', // custom sampler
+  redactMessageContent: (content, { role }) => role === 'assistant' ? '[REDACTED]' : content,
+  redactToolArguments: (args, { functionName }) => functionName === 'sensitive' ? '{}' : args,
+});
+```
+
 ## Backend Integration
 
 eval2otel works with any OpenTelemetry-compatible backend. See [Backend Integration Guide](./docs/backends.md) for specific setup instructions for:
