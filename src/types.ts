@@ -164,6 +164,9 @@ export interface OtelConfig {
 
   /** Whether to emit operational metadata events (conversation, choices, agent, RAG). Default: true */
   emitOperationalMetadata?: boolean;
+
+  /** When true, add gen_ai.message.content_truncated=true when message content is truncated */
+  markTruncatedContent?: boolean;
   
   /** Redaction function for sensitive content */
   redact?: (content: string) => string | null;

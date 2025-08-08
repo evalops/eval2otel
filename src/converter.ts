@@ -323,10 +323,17 @@ export class Eval2OtelConverter {
         const contentStr = typeof message.content === 'string' 
           ? message.content 
           : JSON.stringify(message.content);
-        
         const redactedContent = this.redactMessageContent(contentStr, message.role);
         if (redactedContent !== null) {
-          attributes['gen_ai.message.content'] = redactedContent;
+          const max = this.config.contentMaxLength;
+          if (typeof max === 'number' && max > 0 && redactedContent.length > max) {
+            attributes['gen_ai.message.content'] = redactedContent.slice(0, max);
+            if (this.config.markTruncatedContent) {
+              attributes['gen_ai.message.content_truncated'] = true;
+            }
+          } else {
+            attributes['gen_ai.message.content'] = redactedContent;
+          }
         }
       }
 
@@ -356,10 +363,17 @@ export class Eval2OtelConverter {
         const contentStr = typeof choice.message.content === 'string'
           ? choice.message.content
           : JSON.stringify(choice.message.content);
-        
         const redactedContent = this.redactMessageContent(contentStr, choice.message.role);
         if (redactedContent !== null) {
-          attributes['gen_ai.message.content'] = this.truncateContent(redactedContent);
+          const max = this.config.contentMaxLength;
+          if (typeof max === 'number' && max > 0 && redactedContent.length > max) {
+            attributes['gen_ai.message.content'] = redactedContent.slice(0, max);
+            if (this.config.markTruncatedContent) {
+              attributes['gen_ai.message.content_truncated'] = true;
+            }
+          } else {
+            attributes['gen_ai.message.content'] = redactedContent;
+          }
         }
       }
 
