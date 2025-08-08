@@ -100,65 +100,16 @@ eval2otel.processEvaluationWithMetrics(evalResult, {
 });
 ```
 
-## Ollama Integration
+## Provider Support
 
-eval2otel provides native support for [Ollama](https://ollama.ai), enabling complete observability for local LLM deployments:
+eval2otel includes built-in converters for popular AI providers:
 
-### Using Ollama's Native API
+- **OpenAI** - GPT models, embeddings, and tools
+- **Anthropic** - Claude models and function calling
+- **Ollama** - Local LLMs with `convertOllamaToEval2Otel()` and `convertOpenAICompatibleToEval2Otel()`
+- **Custom** - Any provider following the `EvalResult` schema
 
-```typescript
-import { createEval2Otel, convertOllamaToEval2Otel } from 'eval2otel';
-
-const eval2otel = createEval2Otel({
-  serviceName: 'my-ollama-service',
-  captureContent: true,
-});
-
-// Make request to Ollama
-const request = {
-  model: 'llama3.2',
-  messages: [{ role: 'user', content: 'Hello!' }],
-  temperature: 0.7,
-};
-
-const startTime = Date.now();
-const response = await fetch('http://localhost:11434/api/chat', {
-  method: 'POST',
-  body: JSON.stringify(request),
-});
-const ollamaResponse = await response.json();
-
-// Convert Ollama response to eval2otel format
-const evalResult = convertOllamaToEval2Otel(request, ollamaResponse, startTime);
-
-// Process with quality metrics
-eval2otel.processEvaluation(evalResult, {
-  metrics: { accuracy: 0.95, relevance: 0.88 },
-  attributes: { 'model.local': 'true' },
-});
-```
-
-### Using OpenAI-Compatible Endpoint
-
-```typescript
-import { convertOpenAICompatibleToEval2Otel } from 'eval2otel';
-
-// Ollama's OpenAI-compatible endpoint
-const response = await fetch('http://localhost:11434/v1/chat/completions', {
-  method: 'POST',
-  body: JSON.stringify({ model: 'mistral', messages: [...] }),
-});
-
-const evalResult = convertOpenAICompatibleToEval2Otel(
-  request, 
-  await response.json(), 
-  startTime, 
-  Date.now(),
-  { system: 'ollama' }
-);
-```
-
-See [Ollama Integration Guide](./examples/ollama-integration.md) for detailed examples including tool execution, model comparison, and performance benchmarking.
+See the [examples directory](./examples/) for provider-specific integration guides.
 
 ## Supported Operations
 
@@ -288,135 +239,27 @@ Automatically recorded metrics include:
 
 ## Configuration
 
-```typescript
-interface OtelConfig {
-  serviceName: string;           // Required: Service name
-  serviceVersion?: string;       // Service version
-  environment?: string;          // Deployment environment
-  captureContent?: boolean;      // Opt-in for sensitive content
-  sampleContentRate?: number;    // Content sampling rate (0.0-1.0)
-  contentMaxLength?: number;     // Optional: truncate captured content (characters)
-  markTruncatedContent?: boolean; // Optional: add gen_ai.message.content_truncated flag when truncated
-  contentSampler?: (evalResult: EvalResult) => boolean; // Optional custom sampler
-  emitOperationalMetadata?: boolean; // Suppress conversation/choice/agent/RAG events when false (default true)
-  redact?: (content: string) => string | null; // Custom redaction
-  redactMessageContent?: (content: string, info: { role: string }) => string | null; // Field-level redaction
-  redactToolArguments?: (argsJson: string, info: { functionName: string; callId?: string }) => string | null; // Field-level redaction
-  endpoint?: string;            // OpenTelemetry endpoint
-  exporterProtocol?: 'grpc' | 'http/protobuf' | 'http/json'; // OTLP protocol
-  exporterHeaders?: Record<string, string>; // OTLP headers (e.g., auth)
-  // Per-signal OTLP overrides
-  tracesEndpoint?: string;
-  metricsEndpoint?: string;
-  logsEndpoint?: string;
-  tracesHeaders?: Record<string, string>;
-  metricsHeaders?: Record<string, string>;
-  logsHeaders?: Record<string, string>;
-  resourceAttributes?: Record<string, string | number | boolean>;
-}
+Key configuration options:
 
-## Upgrade to 0.3.x
+- **serviceName** (required) - Your service identifier
+- **captureContent** - Opt-in for message content capture (default: false)
+- **sampleContentRate** - Content sampling rate 0.0-1.0
+- **redact** - Custom redaction function for PII
+- **endpoint** - OpenTelemetry collector endpoint
+- **exporterProtocol** - 'grpc' | 'http/protobuf' | 'http/json'
 
-- Event attribute names for conversation and assistant messages are normalized to `gen_ai.*`:
-  - Conversation: `gen_ai.message.role`, `gen_ai.message.index`, `gen_ai.message.content`, `gen_ai.tool.call.id`.
-  - Assistant: `gen_ai.response.choice.index`, `gen_ai.response.finish_reason`, `gen_ai.message.role`, `gen_ai.message.content`.
-- New options: `emitOperationalMetadata`, `contentMaxLength`, `markTruncatedContent`, `contentSampler`, `redactMessageContent`, `redactToolArguments`.
-- Units: `performance.duration` is in seconds; `agent.step.duration` remains in milliseconds. Update any examples or integrations accordingly.
+See [TypeScript definitions](./dist/types.d.ts) for complete `OtelConfig` interface.
 
-## Using Attribute Constants
 
-For convenience and to avoid typos, the package exports `ATTR` constants for common event attributes:
+## OpenTelemetry Compliance
 
-```ts
-import { ATTR } from 'eval2otel';
+eval2otel follows [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) for spans, events, and metrics.
 
-// Example usage when inspecting events
-event.attributes[ATTR.MESSAGE_CONTENT];
-event.attributes[ATTR.RESPONSE_CHOICE_INDEX];
-event.attributes[ATTR.TOOL_ARGUMENTS];
-```
-
-## Signal-specific OTLP Config
-
-You can override endpoints and headers per signal while keeping a global default:
-
-```ts
-createEval2Otel({
-  serviceName: 'my-app',
-  endpoint: 'https://otlp.example.com', // global
-  exporterProtocol: 'http/protobuf',
-  exporterHeaders: { Authorization: 'Bearer global' },
-
-  // Per-signal overrides
-  tracesEndpoint: 'https://otlp.example.com/v1/traces',
-  metricsEndpoint: 'https://otlp.example.com/v1/metrics',
-  logsEndpoint: 'https://otlp.example.com/v1/logs',
-  tracesHeaders: { Authorization: 'Bearer traces' },
-  metricsHeaders: { Authorization: 'Bearer metrics' },
-  logsHeaders: { Authorization: 'Bearer logs' },
-});
-```
-```
-
-## OpenTelemetry Mapping
-
-eval2otel follows OpenTelemetry GenAI semantic conventions. Here's how `EvalResult` maps to OTel attributes:
-
-### Spans
-
-| Operation | Span Name | Description |
-|-----------|-----------|-------------|
-| `chat` | `gen_ai.chat` | Chat/completion operations |
-| `text_completion` | `gen_ai.chat` | Text completion operations |
-| `embeddings` | `gen_ai.embeddings` | Embedding generation |
-| `execute_tool` | `gen_ai.execute_tool` | Tool execution |
-| `agent_execution` | `gen_ai.agent` | AI agent orchestration |
-| `workflow_step` | `gen_ai.workflow` | Workflow step execution |
-
-### Span Attributes
-
-| EvalResult Field | OTel Attribute | Type | Description |
-|------------------|----------------|------|-------------|
-| `operation` | `gen_ai.operation.name` | string | Operation type |
-| `system` | `gen_ai.system` | string | AI system (openai, anthropic, etc.) |
-| `request.model` | `gen_ai.request.model` | string | Model name |
-| `request.temperature` | `gen_ai.request.temperature` | number | Temperature setting |
-| `request.maxTokens` | `gen_ai.request.max_tokens` | number | Max tokens limit |
-| `request.topP` | `gen_ai.request.top_p` | number | Top-p sampling |
-| `request.topK` | `gen_ai.request.top_k` | number | Top-k sampling |
-| `usage.inputTokens` | `gen_ai.usage.input_tokens` | number | Input token count |
-| `usage.outputTokens` | `gen_ai.usage.output_tokens` | number | Output token count |
-| `response.finishReasons` | `gen_ai.response.finish_reasons` | string[] | Completion reasons |
-| `conversation.id` | `gen_ai.conversation.id` | string | Conversation identifier |
-| `tool.name` | `gen_ai.tool.name` | string | Tool name |
-| `error.type` | `error.type` | string | Error classification |
-
-### Events
-
-| Event Name | Trigger | Attributes |
-|------------|---------|------------|
-| `gen_ai.system.message` | System message | `gen_ai.message.content`, `gen_ai.message.role`, `gen_ai.message.index`, `gen_ai.message.content_truncated?` |
-| `gen_ai.user.message` | User message | `gen_ai.message.content`, `gen_ai.message.role`, `gen_ai.message.index`, `gen_ai.message.content_truncated?` |
-| `gen_ai.assistant.message` | Assistant response | `gen_ai.message.content`, `gen_ai.message.role`, `gen_ai.response.choice.index`, `gen_ai.response.finish_reason`, `gen_ai.message.content_truncated?` |
-| `gen_ai.tool.message` | Tool call/result | `gen_ai.tool.name`, `gen_ai.tool.call.id`, `gen_ai.tool.arguments`, `gen_ai.response.choice.index` |
-
-### Metrics
-
-| Metric Name | Type | Unit | Description |
-|-------------|------|------|-------------|
-| `gen_ai.client.operation.duration` | Histogram | `s` | Operation duration |
-| `gen_ai.client.token.usage` | Counter | `{token}` | Token consumption |
-| `gen_ai.server.time_to_first_token` | Histogram | `s` | Time to first token |
-| `gen_ai.server.time_per_output_token` | Histogram | `s/{token}` | Time per output token |
-| `eval.custom.metric` | Histogram | `1` | Custom quality metrics |
-
-All metrics include attributes for `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.system`, and `deployment.environment`.
-
-#### Units
-
-- Client and server durations are in seconds.
-- Agent step and validation durations are in milliseconds.
-- Ensure inputs match expected units to avoid skewed metrics.
+Key telemetry generated:
+- **Spans**: `gen_ai.chat`, `gen_ai.embeddings`, `gen_ai.execute_tool`
+- **Events**: User/assistant/tool messages with content (when enabled)
+- **Metrics**: Token usage, operation duration, custom quality scores
+- **Attributes**: Model, temperature, tokens, finish reasons, etc.
 
 ## Privacy & Security
 
@@ -434,20 +277,7 @@ const eval2otel = createEval2Otel({
 });
 ```
 
-### Additional Privacy Controls
-
-```typescript
-const eval2otel = createEval2Otel({
-  serviceName: 'my-service',
-  captureContent: true,           // opt-in
-  emitOperationalMetadata: false, // suppress conversation/choice/agent/RAG events
-  contentMaxLength: 4096,         // truncate captured content
-  markTruncatedContent: true,     // add gen_ai.message.content_truncated when applied
-  contentSampler: (evalResult) => evalResult.operation !== 'embeddings', // custom sampler
-  redactMessageContent: (content, { role }) => role === 'assistant' ? '[REDACTED]' : content,
-  redactToolArguments: (args, { functionName }) => functionName === 'sensitive' ? '{}' : args,
-});
-```
+Additional privacy controls available in the [configuration options](#configuration).
 
 ## Backend Integration
 
@@ -459,16 +289,6 @@ eval2otel works with any OpenTelemetry-compatible backend. See [Backend Integrat
 - **New Relic**
 - **Jaeger**
 - **AWS X-Ray**
-
-### Supported AI Providers
-
-eval2otel includes built-in support for:
-
-- **OpenAI** - GPT models, embeddings, and tool execution
-- **Anthropic** - Claude models and function calling
-- **Ollama** - Local LLMs with native and OpenAI-compatible APIs
-- **Custom Providers** - Any provider following the `EvalResult` schema
-- Generic OTLP endpoints
 
 ### Quick OTLP Setup
 
@@ -591,40 +411,16 @@ graph TB
 
 ## API Reference
 
+### Core API
+- `createEval2Otel(config)` - Initialize with OpenTelemetry SDK
+- `processEvaluation(evalResult, options?)` - Process single evaluation
+- `processEvaluations(evalResults[], options?)` - Batch process
+
 ### Provider Converters
+- `convertOllamaToEval2Otel()` - Convert Ollama native responses
+- `convertOpenAICompatibleToEval2Otel()` - Convert OpenAI-compatible responses
 
-#### `convertOllamaToEval2Otel(request, response, startTime, options?)`
-
-Converts Ollama native API responses to eval2otel format.
-
-- **request**: Ollama request object with model, messages, temperature, etc.
-- **response**: Ollama response with message, token counts, and timings
-- **startTime**: Request start timestamp (milliseconds)
-- **options**: Optional conversion settings (evalId, conversationId, toolExecution)
-
-#### `convertOpenAICompatibleToEval2Otel(request, response, startTime, endTime, options?)`
-
-Converts OpenAI-compatible API responses (including Ollama's OpenAI endpoint) to eval2otel format.
-
-- **request**: OpenAI-style request object
-- **response**: OpenAI-style response with choices and usage
-- **startTime**: Request start timestamp (milliseconds)
-- **endTime**: Request end timestamp (milliseconds)
-- **options**: Optional settings (system, evalId, conversationId)
-
-### Core Functions
-
-#### `createEval2Otel(config)`
-
-Creates and initializes an eval2otel instance with OpenTelemetry SDK.
-
-#### `processEvaluation(evalResult, options?)`
-
-Processes a single evaluation result and generates telemetry data.
-
-#### `processEvaluations(evalResults[], options?)`
-
-Batch processes multiple evaluation results.
+Full API documentation available in [TypeScript definitions](./dist/index.d.ts).
 
 ## 🤝 Contributing
 
