@@ -245,6 +245,14 @@ interface OtelConfig {
   exporterHeaders?: Record<string, string>; // OTLP headers (e.g., auth)
   resourceAttributes?: Record<string, string | number | boolean>;
 }
+
+## Upgrade to 0.3.x
+
+- Event attribute names for conversation and assistant messages are normalized to `gen_ai.*`:
+  - Conversation: `gen_ai.message.role`, `gen_ai.message.index`, `gen_ai.message.content`, `gen_ai.tool.call.id`.
+  - Assistant: `gen_ai.response.choice.index`, `gen_ai.response.finish_reason`, `gen_ai.message.role`, `gen_ai.message.content`.
+- New options: `emitOperationalMetadata`, `contentMaxLength`, `markTruncatedContent`, `contentSampler`, `redactMessageContent`, `redactToolArguments`.
+- Units: `performance.duration` is in seconds; `agent.step.duration` remains in milliseconds. Update any examples or integrations accordingly.
 ```
 
 ## OpenTelemetry Mapping
