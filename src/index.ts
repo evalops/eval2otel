@@ -28,11 +28,18 @@ export class Eval2Otel {
       [SemanticResourceAttributes.SERVICE_VERSION]: this.config.serviceVersion ?? '1.0.0',
     });
 
-    this.sdk = new NodeSDK({
+    const sdkConfig = {
       resource,
       instrumentations: [getNodeAutoInstrumentations()],
-    });
+    };
 
+    // Add endpoint configuration if provided
+    if (this.config.endpoint) {
+      // Configure OTLP exporter endpoint
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT = this.config.endpoint;
+    }
+
+    this.sdk = new NodeSDK(sdkConfig);
     this.sdk.start();
   }
 
