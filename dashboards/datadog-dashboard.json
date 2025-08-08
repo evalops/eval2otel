@@ -1,0 +1,244 @@
+{
+  "title": "AI Evaluation Metrics",
+  "description": "Monitor AI model evaluation metrics, performance, and quality",
+  "widgets": [
+    {
+      "id": 1,
+      "definition": {
+        "title": "Operation Duration (P95)",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "query_value",
+        "requests": [
+          {
+            "q": "p95:gen_ai.client.operation.duration{*} by {gen_ai.request.model}",
+            "aggregator": "max"
+          }
+        ],
+        "autoscale": true,
+        "precision": 2,
+        "unit": "s"
+      },
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 3
+      }
+    },
+    {
+      "id": 2,
+      "definition": {
+        "title": "Token Usage Rate",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "sum:gen_ai.client.token.usage{*} by {gen_ai.request.model,direction}.as_rate()",
+            "display_type": "line",
+            "style": {
+              "palette": "dog_classic",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "label": "",
+          "scale": "linear",
+          "min": "auto",
+          "max": "auto",
+          "include_zero": true
+        },
+        "legend": {
+          "size": "0"
+        }
+      },
+      "layout": {
+        "x": 4,
+        "y": 0,
+        "width": 8,
+        "height": 3
+      }
+    },
+    {
+      "id": 3,
+      "definition": {
+        "title": "Quality Score Distribution",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "distribution",
+        "requests": [
+          {
+            "q": "avg:eval.custom.metric{eval.metric.type:quality} by {eval.metric.name}"
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 3,
+        "width": 6,
+        "height": 3
+      }
+    },
+    {
+      "id": 4,
+      "definition": {
+        "title": "Error Rate by System",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "query_value",
+        "requests": [
+          {
+            "q": "sum:gen_ai.client.operation.error{*} by {gen_ai.system}.as_rate() / sum:gen_ai.client.operation.duration{*} by {gen_ai.system}.as_count()",
+            "aggregator": "last"
+          }
+        ],
+        "autoscale": true,
+        "precision": 4,
+        "unit": "%"
+      },
+      "layout": {
+        "x": 6,
+        "y": 3,
+        "width": 3,
+        "height": 3
+      }
+    },
+    {
+      "id": 5,
+      "definition": {
+        "title": "Time to First Token",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "p95:gen_ai.server.time_to_first_token{*} by {gen_ai.request.model}",
+            "display_type": "line",
+            "style": {
+              "palette": "cool",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          },
+          {
+            "q": "p50:gen_ai.server.time_to_first_token{*} by {gen_ai.request.model}",
+            "display_type": "line",
+            "style": {
+              "palette": "warm",
+              "line_type": "dashed",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "label": "seconds",
+          "scale": "linear",
+          "min": "auto",
+          "max": "auto",
+          "include_zero": true
+        }
+      },
+      "layout": {
+        "x": 9,
+        "y": 3,
+        "width": 3,
+        "height": 3
+      }
+    },
+    {
+      "id": 6,
+      "definition": {
+        "title": "Safety Metrics Heatmap",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "heatmap",
+        "requests": [
+          {
+            "q": "max:eval.custom.metric{eval.metric.type:safety} by {eval.metric.name,gen_ai.request.model}"
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 6,
+        "width": 12,
+        "height": 3
+      }
+    },
+    {
+      "id": 7,
+      "definition": {
+        "title": "Cost Analysis (Token Usage)",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "sum:gen_ai.client.token.usage{direction:input} by {gen_ai.request.model}.as_rate() * 0.0001",
+            "display_type": "area",
+            "alias": "Input Cost (estimated)"
+          },
+          {
+            "q": "sum:gen_ai.client.token.usage{direction:output} by {gen_ai.request.model}.as_rate() * 0.0003",
+            "display_type": "area",
+            "alias": "Output Cost (estimated)"
+          }
+        ],
+        "yaxis": {
+          "label": "USD/hour",
+          "scale": "linear",
+          "min": "auto",
+          "max": "auto",
+          "include_zero": true
+        }
+      },
+      "layout": {
+        "x": 0,
+        "y": 9,
+        "width": 6,
+        "height": 3
+      }
+    },
+    {
+      "id": 8,
+      "definition": {
+        "title": "Quality SLO Status",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "slo_list",
+        "show_error_budget": true,
+        "view_type": "detail"
+      },
+      "layout": {
+        "x": 6,
+        "y": 9,
+        "width": 6,
+        "height": 3
+      }
+    }
+  ],
+  "template_variables": [
+    {
+      "name": "environment",
+      "default": "*",
+      "prefix": "deployment.environment"
+    },
+    {
+      "name": "model",
+      "default": "*",
+      "prefix": "gen_ai.request.model"
+    },
+    {
+      "name": "system",
+      "default": "*",
+      "prefix": "gen_ai.system"
+    }
+  ],
+  "layout_type": "ordered",
+  "is_read_only": false,
+  "notify_list": [],
+  "reflow_type": "fixed"
+}

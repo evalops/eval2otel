@@ -1,5 +1,5 @@
 import { metrics, Histogram, Meter } from '@opentelemetry/api';
-import { EvalResult, OtelConfig } from './types';
+import { EvalResult, OtelConfig, ProcessOptions } from './types';
 
 export class Eval2OtelMetrics {
   private meter: Meter;
@@ -53,7 +53,7 @@ export class Eval2OtelMetrics {
   /**
    * Record metrics from an evaluation result
    */
-  recordMetrics(evalResult: EvalResult): void {
+  recordMetrics(evalResult: EvalResult, options?: ProcessOptions): void {
     const baseAttributes = {
       'gen_ai.operation.name': evalResult.operation,
       'gen_ai.system': evalResult.system ?? 'unknown',
@@ -65,6 +65,16 @@ export class Eval2OtelMetrics {
     const attributes: Record<string, string | number> = { ...baseAttributes };
     if (evalResult.error) {
       attributes['error.type'] = evalResult.error.type;
+    }
+
+    // Add environment if configured
+    if (this.config.environment) {
+      attributes['deployment.environment'] = this.config.environment;
+    }
+
+    // Add additional attributes from options
+    if (options?.attributes) {
+      Object.assign(attributes, options.attributes);
     }
 
     // Record token usage metrics
@@ -82,22 +92,25 @@ export class Eval2OtelMetrics {
       });
     }
 
-    // Record operation duration (convert from milliseconds to seconds)
-    this.operationDurationHistogram.record(evalResult.performance.duration / 1000, attributes);
+    // Record operation duration (already in seconds from validation)
+    this.operationDurationHistogram.record(evalResult.performance.duration, attributes);
 
-    // Record server-side metrics if available
+    // Record server-side metrics if available (already in seconds from validation)
     if (evalResult.performance.timeToFirstToken !== undefined) {
-      this.timeToFirstTokenHistogram.record(evalResult.performance.timeToFirstToken / 1000, attributes);
+      this.timeToFirstTokenHistogram.record(evalResult.performance.timeToFirstToken, attributes);
     }
 
-    if (evalResult.performance.timePerOutputToken !== undefined && evalResult.usage.outputTokens) {
-      // Calculate average time per output token
-      const avgTimePerToken = evalResult.performance.timePerOutputToken / 1000;
-      this.timePerOutputTokenHistogram.record(avgTimePerToken, attributes);
+    if (evalResult.performance.timePerOutputToken !== undefined) {
+      this.timePerOutputTokenHistogram.record(evalResult.performance.timePerOutputToken, attributes);
     }
 
     // Record request duration (same as operation duration for client-side)
-    this.requestDurationHistogram.record(evalResult.performance.duration / 1000, attributes);
+    this.requestDurationHistogram.record(evalResult.performance.duration, attributes);
+
+    // Record additional custom metrics if provided in options
+    if (options?.metrics) {
+      this.recordCustomMetrics(options.metrics, attributes);
+    }
   }
 
   /**
@@ -118,6 +131,45 @@ export class Eval2OtelMetrics {
       description,
       unit,
     });
+  }
+
+  /**
+   * Record custom metrics with proper naming
+   */
+  private recordCustomMetrics(
+    metrics: Record<string, number>, 
+    baseAttributes: Record<string, string | number>
+  ): void {
+    Object.entries(metrics).forEach(([name, value]) => {
+      const histogram = this.createEvalHistogram(name, `Custom evaluation metric: ${name}`);
+      histogram.record(value, {
+        ...baseAttributes,
+        'eval.metric.name': name,
+        'eval.metric.type': this.getMetricType(name),
+      });
+    });
+  }
+
+  /**
+   * Determine metric type from name for better categorization
+   */
+  private getMetricType(metricName: string): string {
+    const name = metricName.toLowerCase();
+    
+    if (name.includes('accuracy') || name.includes('precision') || name.includes('recall') || name.includes('f1')) {
+      return 'quality';
+    }
+    if (name.includes('bleu') || name.includes('rouge') || name.includes('meteor')) {
+      return 'similarity';
+    }
+    if (name.includes('toxicity') || name.includes('bias') || name.includes('safety')) {
+      return 'safety';
+    }
+    if (name.includes('latency') || name.includes('duration') || name.includes('time')) {
+      return 'performance';
+    }
+    
+    return 'custom';
   }
 
   /**

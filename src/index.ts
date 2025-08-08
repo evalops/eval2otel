@@ -5,7 +5,7 @@ import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
 
 import { Eval2OtelConverter } from './converter';
 import { Eval2OtelMetrics } from './metrics';
-import { EvalResult, OtelConfig } from './types';
+import { EvalResult, OtelConfig, ProcessOptions } from './types';
 
 export class Eval2Otel {
   private converter: Eval2OtelConverter;
@@ -14,19 +14,40 @@ export class Eval2Otel {
   private config: OtelConfig;
 
   constructor(config: OtelConfig) {
-    this.config = config;
-    this.converter = new Eval2OtelConverter(config);
-    this.metrics = new Eval2OtelMetrics(config);
+    // Set defaults for privacy and sampling
+    this.config = {
+      captureContent: false, // Default to false for privacy
+      sampleContentRate: 1.0,
+      ...config,
+    };
+    this.converter = new Eval2OtelConverter(this.config);
+    this.metrics = new Eval2OtelMetrics(this.config);
   }
 
   /**
-   * Initialize OpenTelemetry SDK
+   * Initialize OpenTelemetry SDK with proper resource attributes
    */
   initialize(): void {
-    const resource = new Resource({
+    const resourceAttributes: Record<string, string> = {
       [SemanticResourceAttributes.SERVICE_NAME]: this.config.serviceName,
       [SemanticResourceAttributes.SERVICE_VERSION]: this.config.serviceVersion ?? '1.0.0',
-    });
+      [SemanticResourceAttributes.TELEMETRY_SDK_NAME]: 'eval2otel',
+      [SemanticResourceAttributes.TELEMETRY_SDK_VERSION]: process.env.npm_package_version ?? '0.1.0',
+    };
+
+    // Add environment if configured
+    if (this.config.environment) {
+      resourceAttributes[SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT] = this.config.environment;
+    }
+
+    // Add custom resource attributes
+    if (this.config.resourceAttributes) {
+      Object.entries(this.config.resourceAttributes).forEach(([key, value]) => {
+        resourceAttributes[key] = String(value);
+      });
+    }
+
+    const resource = new Resource(resourceAttributes);
 
     const sdkConfig = {
       resource,
@@ -53,25 +74,40 @@ export class Eval2Otel {
   }
 
   /**
-   * Process a single evaluation result
+   * Process a single evaluation result with optional additional context
    */
-  processEvaluation(evalResult: EvalResult): void {
-    // Convert to OpenTelemetry spans and events
-    this.converter.convertEvalResult(evalResult);
-    
-    // Record metrics
-    this.metrics.recordMetrics(evalResult);
+  processEvaluation(evalResult: EvalResult, options?: ProcessOptions): void {
+    try {
+      // Convert to OpenTelemetry spans and events
+      this.converter.convertEvalResult(evalResult, options);
+      
+      // Record metrics
+      this.metrics.recordMetrics(evalResult, options);
+    } catch (error) {
+      console.error('Error processing evaluation:', error);
+      throw error; // Re-throw for proper error handling
+    }
   }
 
   /**
    * Process multiple evaluation results
    */
-  processEvaluations(evalResults: EvalResult[]): void {
-    evalResults.forEach(result => this.processEvaluation(result));
+  processEvaluations(evalResults: EvalResult[], options?: ProcessOptions): void {
+    evalResults.forEach(result => this.processEvaluation(result, options));
   }
 
   /**
-   * Process evaluation with custom quality metrics
+   * Helper to run a function within an evaluation span context
+   */
+  async withSpan<T>(evalResult: EvalResult, fn: () => Promise<T> | T, options?: ProcessOptions): Promise<T> {
+    // For now, just process the evaluation and run the function
+    // In a full implementation, this would create an active span context
+    this.processEvaluation(evalResult, options);
+    return await fn();
+  }
+
+  /**
+   * Process evaluation with custom quality metrics (deprecated - use options.metrics instead)
    */
   processEvaluationWithMetrics(
     evalResult: EvalResult, 
@@ -106,7 +142,7 @@ export class Eval2Otel {
 }
 
 // Re-export types and classes
-export { EvalResult, OtelConfig, GenAIAttributes } from './types';
+export { EvalResult, OtelConfig, GenAIAttributes, ProcessOptions } from './types';
 export { Eval2OtelConverter } from './converter';
 export { Eval2OtelMetrics } from './metrics';
 

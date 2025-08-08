@@ -1,0 +1,170 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "AI Evaluation Metrics",
+    "tags": ["ai", "evaluation", "opentelemetry"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Operation Duration",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(gen_ai_client_operation_duration_bucket[5m])) by (le, gen_ai_request_model))",
+            "legendFormat": "95th percentile - {{gen_ai_request_model}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 2},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Token Usage by Model",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(gen_ai_client_token_usage_total[5m])) by (gen_ai_request_model, direction)",
+            "legendFormat": "{{gen_ai_request_model}} - {{direction}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "token/s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "fillOpacity": 0.1
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Quality Metrics Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, sum(rate(eval_custom_metric_bucket{eval_metric_type=\"quality\"}[5m])) by (le, eval_metric_name))",
+            "legendFormat": "{{eval_metric_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 1,
+            "unit": "percentunit",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 0.2
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Error Rate by System",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(gen_ai_client_operation_error_total[5m])) by (gen_ai_system) / sum(rate(gen_ai_client_operation_duration_count[5m])) by (gen_ai_system)",
+            "legendFormat": "{{gen_ai_system}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.01},
+                {"color": "red", "value": 0.05}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Time to First Token",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(gen_ai_server_time_to_first_token_bucket[5m])) by (le, gen_ai_request_model))",
+            "legendFormat": "{{gen_ai_request_model}} - 95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.5, sum(rate(gen_ai_server_time_to_first_token_bucket[5m])) by (le, gen_ai_request_model))",
+            "legendFormat": "{{gen_ai_request_model}} - median"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "fillOpacity": 0.1
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Safety Metrics",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(eval_custom_metric_bucket{eval_metric_type=\"safety\"}[5m])) by (le, eval_metric_name))",
+            "legendFormat": "{{eval_metric_name}} - 95th percentile"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 1,
+            "unit": "percentunit",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.1},
+                {"color": "red", "value": 0.2}
+              ]
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 2,
+              "fillOpacity": 0.2
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24}
+      }
+    ]
+  }
+}

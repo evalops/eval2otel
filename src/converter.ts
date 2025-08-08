@@ -1,5 +1,5 @@
-import { SpanKind, SpanStatusCode, trace, Span } from '@opentelemetry/api';
-import { EvalResult, GenAIAttributes, OtelConfig } from './types';
+import { SpanKind, SpanStatusCode, trace, Span, context } from '@opentelemetry/api';
+import { EvalResult, GenAIAttributes, OtelConfig, ProcessOptions, EvalResultSchema } from './types';
 
 export class Eval2OtelConverter {
   private tracer;
@@ -13,48 +13,106 @@ export class Eval2OtelConverter {
   /**
    * Convert an evaluation result to OpenTelemetry span and events
    */
-  convertEvalResult(evalResult: EvalResult): void {
-    const spanName = `${evalResult.operation} ${evalResult.request.model}`;
-    const startTime = evalResult.timestamp;
-    const endTime = startTime + evalResult.performance.duration;
+  convertEvalResult(evalResult: EvalResult, options?: ProcessOptions): void {
+    // Validate input
+    const validated = EvalResultSchema.parse(evalResult);
+    
+    // Generate operation-centric span name per OTel conventions
+    const spanName = this.getOperationSpanName(validated.operation);
+    const startTime = validated.timestamp;
+    const endTime = startTime + (validated.performance.duration * 1000); // Convert seconds to milliseconds
+    
+    // Set up parent context if provided
+    const parentContext = options?.parentSpan 
+      ? trace.setSpan(context.active(), options.parentSpan as Span)
+      : context.active();
 
     const span = this.tracer.startSpan(spanName, {
       kind: SpanKind.CLIENT,
       startTime,
-      attributes: this.buildSpanAttributes(evalResult),
-    });
+      attributes: this.buildSpanAttributes(validated, options?.attributes),
+    }, parentContext);
 
     // Set span status based on error
-    if (evalResult.error) {
+    if (validated.error) {
+      span.recordException({
+        name: validated.error.type,
+        message: validated.error.message,
+      });
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: evalResult.error.message,
+        message: validated.error.message,
       });
     } else {
       span.setStatus({ code: SpanStatusCode.OK });
     }
 
-    // Add conversation events if present
-    if (evalResult.conversation && this.config.captureContent) {
-      this.addConversationEvents(span, evalResult);
+    // Add conversation events if present and content capture is enabled
+    if (validated.conversation && this.shouldCaptureContent()) {
+      this.addConversationEvents(span, validated);
     }
 
     // Add choice events for response
-    if (evalResult.response.choices && this.config.captureContent) {
-      this.addChoiceEvents(span, evalResult);
+    if (validated.response.choices && this.shouldCaptureContent()) {
+      this.addChoiceEvents(span, validated);
     }
 
     span.end(endTime);
   }
 
   /**
+   * Generate operation-centric span names per OTel GenAI conventions
+   */
+  private getOperationSpanName(operation: string): string {
+    switch (operation) {
+      case 'chat':
+      case 'text_completion':
+        return 'gen_ai.chat';
+      case 'embeddings':
+        return 'gen_ai.embeddings';
+      case 'execute_tool':
+        return 'gen_ai.execute_tool';
+      default:
+        return 'gen_ai.operation';
+    }
+  }
+
+  /**
+   * Determine if content should be captured based on config and sampling
+   */
+  private shouldCaptureContent(): boolean {
+    if (!this.config.captureContent) return false;
+    
+    const sampleRate = this.config.sampleContentRate ?? 1.0;
+    return Math.random() <= sampleRate;
+  }
+
+  /**
+   * Apply redaction if configured
+   */
+  private redactContent(content: string): string | null {
+    if (this.config.redact) {
+      return this.config.redact(content);
+    }
+    return content;
+  }
+
+  /**
    * Build OpenTelemetry span attributes from eval result
    */
-  private buildSpanAttributes(evalResult: EvalResult): GenAIAttributes {
+  private buildSpanAttributes(
+    evalResult: EvalResult, 
+    additionalAttributes?: Record<string, string | number | boolean>
+  ): GenAIAttributes {
     const attributes: GenAIAttributes = {
       'gen_ai.operation.name': evalResult.operation,
       'gen_ai.system': evalResult.system ?? 'unknown',
     };
+
+    // Add service attributes
+    if (this.config.environment) {
+      attributes['deployment.environment'] = this.config.environment;
+    }
 
     // Request attributes
     if (evalResult.request.model) {
@@ -128,6 +186,11 @@ export class Eval2OtelConverter {
       }
     }
 
+    // Add additional attributes if provided
+    if (additionalAttributes) {
+      Object.assign(attributes, additionalAttributes);
+    }
+
     return attributes;
   }
 
@@ -137,22 +200,27 @@ export class Eval2OtelConverter {
   private addConversationEvents(span: Span, evalResult: EvalResult): void {
     if (!evalResult.conversation) return;
 
-    evalResult.conversation.messages.forEach((message) => {
+    evalResult.conversation.messages.forEach((message, index) => {
       const eventName = `gen_ai.${message.role}.message`;
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
         role: message.role,
+        index,
       };
 
-      if (message.content && this.config.captureContent) {
-        // Convert complex content to string for OpenTelemetry compatibility
-        attributes.content = typeof message.content === 'string' 
+      if (message.content) {
+        const contentStr = typeof message.content === 'string' 
           ? message.content 
           : JSON.stringify(message.content);
+        
+        const redactedContent = this.redactContent(contentStr);
+        if (redactedContent !== null) {
+          attributes.content = redactedContent;
+        }
       }
 
       if (message.toolCallId) {
-        attributes.id = message.toolCallId;
+        attributes['tool.call_id'] = message.toolCallId;
       }
 
       span.addEvent(eventName, attributes);
@@ -168,33 +236,37 @@ export class Eval2OtelConverter {
     evalResult.response.choices.forEach((choice) => {
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
-        index: choice.index,
-        finish_reason: choice.finishReason,
+        'choice.index': choice.index,
+        'choice.finish_reason': choice.finishReason,
         'message.role': choice.message.role,
       };
 
-      if (choice.message.content && this.config.captureContent) {
-        // Convert complex content to string for OpenTelemetry compatibility
-        attributes['message.content'] = typeof choice.message.content === 'string'
+      if (choice.message.content) {
+        const contentStr = typeof choice.message.content === 'string'
           ? choice.message.content
           : JSON.stringify(choice.message.content);
+        
+        const redactedContent = this.redactContent(contentStr);
+        if (redactedContent !== null) {
+          attributes['message.content'] = redactedContent;
+        }
       }
 
-      if (choice.message.toolCalls && this.config.captureContent) {
-        // Serialize tool calls as JSON string for OpenTelemetry compatibility
-        attributes['message.tool_calls'] = JSON.stringify(
-          choice.message.toolCalls.map((toolCall) => ({
-            id: toolCall.id,
-            type: toolCall.type,
-            function: {
-              name: toolCall.function.name,
-              arguments: toolCall.function.arguments,
-            },
-          }))
-        );
+      if (choice.message.toolCalls) {
+        // Add tool call events separately for better structure
+        choice.message.toolCalls.forEach((toolCall, index) => {
+          span.addEvent('gen_ai.tool.message', {
+            'gen_ai.system': evalResult.system ?? 'unknown',
+            'tool.name': toolCall.function.name,
+            'tool.call_id': toolCall.id,
+            'choice.index': choice.index,
+            index,
+            arguments: this.redactContent(JSON.stringify(toolCall.function.arguments)) ?? '{}',
+          });
+        });
       }
 
-      span.addEvent('gen_ai.choice', attributes);
+      span.addEvent('gen_ai.assistant.message', attributes);
     });
   }
 }

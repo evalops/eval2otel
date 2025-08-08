@@ -11,7 +11,13 @@
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts"
   },
-  "keywords": ["opentelemetry", "genai", "evaluation", "metrics", "observability"],
+  "keywords": [
+    "opentelemetry",
+    "genai",
+    "evaluation",
+    "metrics",
+    "observability"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
@@ -27,8 +33,9 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.40.0",
     "@opentelemetry/sdk-node": "^0.45.0",
     "@opentelemetry/semantic-conventions": "^1.18.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.40.0"
+    "zod": "^4.0.15"
   }
 }
