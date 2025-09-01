@@ -808,8 +808,8 @@ export function convertVertexToEval2Otel(
                 (safetyRatings as any[])
                   .filter((r: any) => r?.category && r?.probability)
                   .map((r: any) => [
-                    f"gen_ai.safety.severity.{str(r['category'])}",
-                    str(r['probability']).upper(),
+                    'gen_ai.safety.severity.' + String(r.category),
+                    String(r.probability).toUpperCase(),
                   ])
               )
             : {}
