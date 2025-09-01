@@ -234,6 +234,7 @@ export {
   convertVertexToEval2Otel,
   convertAnthropicToEval2Otel,
   convertCohereToEval2Otel,
+  convertOpenAIChatToEval2Otel,
   type OllamaResponse,
   type OllamaRequest,
   type OllamaConversionOptions,
@@ -248,6 +249,8 @@ export {
   type AnthropicResponse,
   type CohereRequest,
   type CohereResponse,
+  type OpenAIChatRequest,
+  type OpenAIChatResponse,
 } from './providers';
 
 // Convenience function for quick setup

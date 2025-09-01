@@ -297,6 +297,107 @@ export function convertOpenAICompatibleToEval2Otel(
 }
 
 /**
+ * OpenAI native Chat Completions conversion (full shape incl. system_fingerprint, logprobs)
+ */
+export interface OpenAIChatRequest {
+  model: string;
+  messages: Array<{ role: string; content: string | null }>;
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  stop?: string[];
+  seed?: number;
+  n?: number;
+}
+
+export interface OpenAIChatResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  system_fingerprint?: string;
+  choices: Array<{
+    index: number;
+    message: {
+      role: string;
+      content: string | null;
+      tool_calls?: Array<{
+        id: string;
+        type: string;
+        function: { name: string; arguments: string };
+      }>;
+    };
+    logprobs?: unknown;
+    finish_reason: string;
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
+export function convertOpenAIChatToEval2Otel(
+  request: OpenAIChatRequest,
+  response: OpenAIChatResponse,
+  startTime: number,
+  endTime: number,
+  options: { evalId?: string; conversationId?: string } = {}
+): EvalResult {
+  const evalId = options.evalId ?? `openai-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const duration = (endTime - startTime) / 1000;
+  return {
+    id: evalId,
+    timestamp: startTime,
+    model: response.model,
+    system: 'openai',
+    operation: response.choices.some(c => c.message.tool_calls && c.message.tool_calls.length > 0) ? 'execute_tool' : 'chat',
+    request: {
+      model: request.model,
+      temperature: request.temperature,
+      maxTokens: request.max_tokens,
+      topP: request.top_p,
+      frequencyPenalty: request.frequency_penalty,
+      presencePenalty: request.presence_penalty,
+      stopSequences: request.stop,
+      seed: request.seed,
+      choiceCount: request.n ?? 1,
+    },
+    response: {
+      id: response.id,
+      model: response.model,
+      finishReasons: response.choices.map(c => c.finish_reason),
+      choices: response.choices.map(c => ({
+        index: c.index,
+        finishReason: c.finish_reason,
+        message: {
+          role: c.message.role,
+          content: c.message.content ?? '',
+          toolCalls: c.message.tool_calls?.map(tc => ({ id: tc.id, type: tc.type, function: { name: tc.function.name, arguments: JSON.parse(tc.function.arguments) } })),
+        },
+      })),
+    },
+    usage: {
+      inputTokens: response.usage?.prompt_tokens,
+      outputTokens: response.usage?.completion_tokens,
+      totalTokens: response.usage?.total_tokens,
+    },
+    performance: { duration },
+    provider: {
+      name: 'openai',
+      attributes: {
+        ...(response.system_fingerprint ? { 'openai.system_fingerprint': response.system_fingerprint } : {}),
+        // Keep logprobs compact by storing only for the first choice if present
+        ...(response.choices?.[0]?.logprobs ? { 'openai.choice0.logprobs': JSON.stringify(response.choices[0].logprobs) } : {}),
+      },
+    },
+    conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
+  } as EvalResult;
+}
+
+/**
  * Anthropic Messages API conversion (simplified generic mapping)
  */
 export interface AnthropicRequest {
