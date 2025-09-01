@@ -136,6 +136,12 @@ export const EvalResultSchema = z.object({
       faithfulness: z.number().optional(),
     }).optional(),
   }).optional(),
+  
+  // Provider-specific supplemental attributes to include on spans
+  provider: z.object({
+    name: z.string().optional(),
+    attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+  }).optional(),
 });
 
 export type EvalResult = z.infer<typeof EvalResultSchema>;

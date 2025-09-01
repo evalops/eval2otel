@@ -338,6 +338,11 @@ export class Eval2OtelConverter {
       }
     }
 
+    // Provider-supplied attributes passthrough (already namespaced)
+    if ((evalResult as any).provider?.attributes) {
+      Object.assign(attributes as any, (evalResult as any).provider.attributes);
+    }
+
     // Add additional attributes if provided
     if (additionalAttributes) {
       Object.assign(attributes, additionalAttributes);

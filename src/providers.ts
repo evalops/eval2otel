@@ -351,6 +351,13 @@ export function convertBedrockToEval2Otel(
       totalTokens: response.usage?.totalTokens ?? ((response.usage?.inputTokens ?? 0) + (response.usage?.outputTokens ?? 0)),
     },
     performance: { duration },
+    provider: {
+      name: 'aws.bedrock',
+      attributes: {
+        'aws.bedrock.stop_reason': response.stopReason ?? 'unknown',
+        ...(response as any).guardrailTrace ? { 'aws.bedrock.guardrail.trace': JSON.stringify((response as any).guardrailTrace) } : {},
+      },
+    },
     conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
   } as EvalResult;
 }
@@ -406,6 +413,12 @@ export function convertAzureOpenAIToEval2Otel(
       totalTokens: response.usage?.total_tokens,
     },
     performance: { duration },
+    provider: {
+      name: 'azure.openai',
+      attributes: {
+        ...(response as any).prompt_filter_results ? { 'azure.openai.prompt_filter_results': JSON.stringify((response as any).prompt_filter_results) } : {},
+      },
+    },
     conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
   } as EvalResult;
 }
@@ -468,6 +481,12 @@ export function convertVertexToEval2Otel(
       totalTokens: response.usageMetadata?.totalTokenCount,
     },
     performance: { duration },
+    provider: {
+      name: 'google.vertex',
+      attributes: {
+        ...(response as any).candidates?.[0]?.safetyRatings ? { 'google.vertex.safety_ratings': JSON.stringify((response as any).candidates[0].safetyRatings) } : {},
+      },
+    },
     conversation: request.contents ? {
       id: options.conversationId ?? `conv-${evalId}`,
       messages: request.contents.map(m => ({ role: m.role as any, content: (m.parts.map(p => p.text).filter(Boolean).join('\n')) || '' })),
