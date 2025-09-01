@@ -618,3 +618,109 @@ if (evalResult) {
 - Service name precedence: `OTEL_SERVICE_NAME` overrides configured `serviceName`. Set one or the other, not both.
 - No content captured: `captureContent` defaults to false; enable it and ensure sampling/redaction don’t drop content.
 - Unknown provider in CLI: pass `--provider <mode>` or use `--autodetect-strict` to fail fast instead of falling back.
+
+
+## Provider Payload Shapes (Minimal)
+
+Below are minimal request/response shapes used by the built-in converters. Real payloads often include additional fields.
+
+- OpenAI (Chat Completions)
+```json
+{
+  "request": { "model": "gpt-4o", "messages": [{ "role": "user", "content": "hi" }] },
+  "response": {
+    "id": "chatcmpl-1",
+    "object": "chat.completion",
+    "model": "gpt-4o",
+    "choices": [{ "index": 0, "message": { "role": "assistant", "content": "ok" }, "finish_reason": "stop" }],
+    "usage": { "prompt_tokens": 3, "completion_tokens": 5, "total_tokens": 8 }
+  }
+}
+```
+
+- OpenAI-compatible
+```json
+{
+  "request": { "model": "gpt-4o" },
+  "response": {
+    "id": "id",
+    "model": "gpt-4o",
+    "choices": [{
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "ok",
+        "tool_calls": [{ "id": "t", "type": "function", "function": { "name": "f", "arguments": "{"x":1}" } }]
+      },
+      "finish_reason": "stop"
+    }],
+    "usage": { "prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3 }
+  }
+}
+```
+
+- Anthropic (Messages)
+```json
+{
+  "request": { "model": "claude-3", "messages": [{ "role": "user", "content": [{ "type": "text", "text": "hi" }] }] },
+  "response": {
+    "id": "a1",
+    "model": "claude-3",
+    "content": [ { "type": "text", "text": "ok" }, { "type": "tool_use", "name": "search", "input": { "q": "x" } } ],
+    "stop_reason": "tool_use",
+    "usage": { "input_tokens": 1, "output_tokens": 2, "total_tokens": 3 }
+  }
+}
+```
+
+- Cohere (Chat)
+```json
+{
+  "request": { "model": "command-r" },
+  "response": {
+    "id": "c1",
+    "model": "command-r",
+    "text": "ok",
+    "finish_reason": "COMPLETE",
+    "meta": { "billed_units": { "input_tokens": 1, "output_tokens": 2, "total_tokens": 3 } },
+    "safety": { "flagged": false }
+  }
+}
+```
+
+- AWS Bedrock (Generic)
+```json
+{
+  "request": { "modelId": "anthropic.claude-3" },
+  "response": { "modelId": "anthropic.claude-3", "outputText": "ok", "stopReason": "end_turn" }
+}
+```
+
+- Google Vertex (Gemini)
+```json
+{
+  "request": { "model": "gemini-1.5", "contents": [{ "role": "user", "parts": [{ "text": "hi" }] }] },
+  "response": {
+    "model": "gemini-1.5",
+    "candidates": [{ "content": { "role": "assistant", "parts": [{ "text": "ok" }] }, "safetyRatings": [{ "category": "HATE", "probability": "LOW" }] }],
+    "usageMetadata": { "promptTokenCount": 1, "candidatesTokenCount": 2, "totalTokenCount": 3 }
+  }
+}
+```
+
+- Ollama
+```json
+{
+  "request": { "model": "llama3" },
+  "response": {
+    "model": "llama3",
+    "created_at": "2024-08-01T00:00:00Z",
+    "message": { "role": "assistant", "content": "ok" },
+    "done": true,
+    "total_duration": 1000000000,
+    "load_duration": 100000000,
+    "eval_count": 10,
+    "eval_duration": 500000000
+  }
+}
+```
