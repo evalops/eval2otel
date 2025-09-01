@@ -602,3 +602,19 @@ if (evalResult) {
   // pass evalResult into your Eval2Otel instance
 }
 ```
+
+
+## Troubleshooting
+
+- Provider-native payloads: If CLI autodetect fails, specify `--provider` or use the helpers to convert programmatically. See example scripts:
+  - `examples/provider-openai-chat.ts`
+  - `examples/provider-openai-compat.ts`
+  - `examples/provider-anthropic.ts`
+  - `examples/provider-cohere.ts`
+  - `examples/provider-bedrock.ts`
+  - `examples/provider-vertex.ts`
+  - `examples/provider-ollama.ts`
+- OTLP exporter mismatch: Ensure `--protocol` matches your collector (`grpc` vs `http/protobuf`) and the endpoint uses the right port/path.
+- Service name precedence: `OTEL_SERVICE_NAME` overrides configured `serviceName`. Set one or the other, not both.
+- No content captured: `captureContent` defaults to false; enable it and ensure sampling/redaction don’t drop content.
+- Unknown provider in CLI: pass `--provider <mode>` or use `--autodetect-strict` to fail fast instead of falling back.
