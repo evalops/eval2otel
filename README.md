@@ -273,6 +273,54 @@ Advanced options:
 
 
 
+
+
+#### Provider Replay Examples
+
+Each line contains a provider-native `{ request, response, startTime, endTime }` JSON object:
+
+- OpenAI native chat
+```jsonl
+{"startTime": 1725170000000, "endTime": 1725170001200, "request": {"model": "gpt-4o", "messages": [{"role":"user","content":"hi"}]}, "response": {"id":"id","object":"chat.completion","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}}
+```
+Replay: `npx eval2otel-cli ingest --file openai.jsonl --provider openai-chat`
+
+- OpenAI-compatible
+```jsonl
+{"startTime": 1725170000000, "endTime": 1725170001000, "request": {"model":"gpt-4o"}, "response": {"id":"id","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"ok","tool_calls":[{"id":"t","type":"function","function":{"name":"f","arguments":"{"x":1}"}}]},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}}
+```
+Replay: `npx eval2otel-cli ingest --file openai-compat.jsonl --provider openai-compatible`
+
+- Anthropic
+```jsonl
+{"startTime": 1725170000000, "endTime": 1725170001400, "request": {"model":"claude-3"}, "response": {"id":"a1","model":"claude-3","content":[{"type":"text","text":"hi"}],"stop_reason":"stop"}}
+```
+Replay: `npx eval2otel-cli ingest --file anthropic.jsonl --provider anthropic`
+
+- Cohere
+```jsonl
+{"startTime": 1725170000000, "endTime": 1725170000500, "request": {"model":"command-r"}, "response": {"id":"c1","model":"command-r","text":"ok","finish_reason":"COMPLETE","meta":{"billed_units":{"input_tokens":1,"output_tokens":2}}}}
+```
+Replay: `npx eval2otel-cli ingest --file cohere.jsonl --provider cohere`
+
+- AWS Bedrock
+```jsonl
+{"startTime": 1725170000000, "endTime": 1725170000800, "request": {"modelId":"anthropic.claude-3"}, "response": {"modelId":"anthropic.claude-3","outputText":"ok","stopReason":"end_turn"}}
+```
+Replay: `npx eval2otel-cli ingest --file bedrock.jsonl --provider bedrock`
+
+- Google Vertex
+```jsonl
+{"startTime": 1725170000000, "endTime": 1725170000600, "request": {"model":"gemini-1.5"}, "response": {"model":"gemini-1.5","candidates":[{"content":{"role":"assistant","parts":[{"text":"ok"}]}}]}}
+```
+Replay: `npx eval2otel-cli ingest --file vertex.jsonl --provider vertex`
+
+- Ollama
+```jsonl
+{"startTime": 1725170000000, "request": {"model":"llama3"}, "response": {"model":"llama3","created_at":"2024-08-01T00:00:00Z","message":{"role":"assistant","content":"ok"},"done":true}}
+```
+Replay: `npx eval2otel-cli ingest --file ollama.jsonl --provider ollama`
+
 ## Safety Normalization
 
 When providers include safety results, eval2otel normalizes common fields:

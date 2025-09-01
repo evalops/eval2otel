@@ -802,6 +802,18 @@ export function convertVertexToEval2Otel(
         ...(safetyRatings ? { 'google.vertex.safety_ratings': JSON.stringify(safetyRatings) } : {}),
         ...(vertexFlagged !== undefined ? { 'gen_ai.safety.flagged': vertexFlagged } : {}),
         ...(vertexCats.length ? { 'gen_ai.safety.categories': vertexCats } : {}),
+        ...(
+          Array.isArray(safetyRatings)
+            ? Object.fromEntries(
+                (safetyRatings as any[])
+                  .filter((r: any) => r?.category && r?.probability)
+                  .map((r: any) => [
+                    f"gen_ai.safety.severity.{str(r['category'])}",
+                    str(r['probability']).upper(),
+                  ])
+              )
+            : {}
+        ),
       },
     },
     conversation: request.contents ? {

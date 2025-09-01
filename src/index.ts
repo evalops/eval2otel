@@ -218,6 +218,7 @@ export class Eval2Otel {
 export { EvalResult, OtelConfig, GenAIAttributes, ProcessOptions } from './types';
 export { Eval2OtelConverter } from './converter';
 export { Eval2OtelMetrics } from './metrics';
+export { detectProvider, convertProviderToEvalResult, type ProviderMode } from './helpers';
 export { 
   Eval2OtelValidation, 
   ValidationResult, 
