@@ -232,6 +232,8 @@ export {
   convertBedrockToEval2Otel,
   convertAzureOpenAIToEval2Otel,
   convertVertexToEval2Otel,
+  convertAnthropicToEval2Otel,
+  convertCohereToEval2Otel,
   type OllamaResponse,
   type OllamaRequest,
   type OllamaConversionOptions,
@@ -242,6 +244,10 @@ export {
   type AzureOpenAIResponse,
   type VertexRequest,
   type VertexResponse,
+  type AnthropicRequest,
+  type AnthropicResponse,
+  type CohereRequest,
+  type CohereResponse,
 } from './providers';
 
 // Convenience function for quick setup

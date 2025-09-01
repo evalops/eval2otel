@@ -297,6 +297,146 @@ export function convertOpenAICompatibleToEval2Otel(
 }
 
 /**
+ * Anthropic Messages API conversion (simplified generic mapping)
+ */
+export interface AnthropicRequest {
+  model: string;
+  messages?: Array<{ role: string; content: Array<{ type: string; text?: string }>|string }>;
+  temperature?: number; max_tokens?: number; top_p?: number; top_k?: number; stop_sequences?: string[]; seed?: number;
+}
+export interface AnthropicResponse {
+  id: string;
+  model: string;
+  stop_reason?: string;
+  content: Array<{ type: 'text'; text: string } | { type: 'tool_use'; name: string; input: Record<string, unknown> }>;
+  usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
+  safety?: Record<string, unknown>;
+}
+
+export function convertAnthropicToEval2Otel(
+  request: AnthropicRequest,
+  response: AnthropicResponse,
+  startTime: number,
+  endTime: number,
+  options: { evalId?: string; conversationId?: string } = {}
+): EvalResult {
+  const evalId = options.evalId ?? `anthropic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const duration = (endTime - startTime) / 1000;
+  const hasToolUse = response.content.some(c => (c as any).type === 'tool_use');
+  const textParts = response.content.filter((c: any) => c.type === 'text').map((c: any) => c.text);
+  const toolCalls = response.content
+    .filter((c: any) => c.type === 'tool_use')
+    .map((t: any, i: number) => ({ id: `tool_${i}`, type: 'function', function: { name: t.name, arguments: t.input } }));
+
+  return {
+    id: evalId,
+    timestamp: startTime,
+    model: response.model,
+    system: 'anthropic',
+    operation: hasToolUse ? 'execute_tool' : 'chat',
+    request: {
+      model: request.model,
+      temperature: request.temperature,
+      maxTokens: request.max_tokens,
+      topP: request.top_p,
+      topK: request.top_k,
+      stopSequences: request.stop_sequences,
+      seed: request.seed,
+      choiceCount: 1,
+    },
+    response: {
+      id: response.id,
+      model: response.model,
+      finishReasons: [response.stop_reason ?? 'stop'],
+      choices: [{ index: 0, finishReason: response.stop_reason ?? 'stop', message: { role: 'assistant', content: textParts.join('\n'), toolCalls } }],
+    },
+    usage: {
+      inputTokens: response.usage?.input_tokens,
+      outputTokens: response.usage?.output_tokens,
+      totalTokens: response.usage?.total_tokens,
+    },
+    performance: { duration },
+    provider: {
+      name: 'anthropic',
+      attributes: {
+        ...(response.stop_reason ? { 'anthropic.stop_reason': response.stop_reason } : {}),
+        ...(response.safety ? { 'anthropic.safety': JSON.stringify(response.safety) } : {}),
+      },
+    },
+    conversation: request.messages ? {
+      id: options.conversationId ?? `conv-${evalId}`,
+      messages: (request.messages as any[]).map((m: any) => ({ role: m.role, content: Array.isArray(m.content) ? (m.content.map((p:any)=>p.text).filter(Boolean).join('\n')) : m.content }))
+    } : undefined,
+  } as EvalResult;
+}
+
+/**
+ * Cohere Chat conversion (simplified generic mapping)
+ */
+export interface CohereRequest {
+  model: string;
+  messages?: Array<{ role: string; content: string }>;
+  temperature?: number; max_tokens?: number; p?: number; k?: number; stop_sequences?: string[]; seed?: number;
+}
+export interface CohereResponse {
+  id: string;
+  model: string;
+  text: string;
+  finish_reason?: string;
+  meta?: { billed_units?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } };
+  safety?: Record<string, unknown>;
+}
+
+export function convertCohereToEval2Otel(
+  request: CohereRequest,
+  response: CohereResponse,
+  startTime: number,
+  endTime: number,
+  options: { evalId?: string; conversationId?: string } = {}
+): EvalResult {
+  const evalId = options.evalId ?? `cohere-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const duration = (endTime - startTime) / 1000;
+  const billed = response.meta?.billed_units ?? {};
+  return {
+    id: evalId,
+    timestamp: startTime,
+    model: response.model,
+    system: 'cohere',
+    operation: 'chat',
+    request: {
+      model: request.model,
+      temperature: request.temperature,
+      maxTokens: request.max_tokens,
+      topP: request.p,
+      topK: request.k,
+      stopSequences: request.stop_sequences,
+      seed: request.seed,
+      choiceCount: 1,
+    },
+    response: {
+      id: response.id,
+      model: response.model,
+      finishReasons: [response.finish_reason ?? 'stop'],
+      choices: [{ index: 0, finishReason: response.finish_reason ?? 'stop', message: { role: 'assistant', content: response.text } }],
+    },
+    usage: {
+      inputTokens: billed.input_tokens,
+      outputTokens: billed.output_tokens,
+      totalTokens: billed.total_tokens ?? ((billed.input_tokens ?? 0) + (billed.output_tokens ?? 0)),
+    },
+    performance: { duration },
+    provider: {
+      name: 'cohere',
+      attributes: {
+        ...(response.finish_reason ? { 'cohere.finish_reason': response.finish_reason } : {}),
+        ...(response.safety ? { 'cohere.safety': JSON.stringify(response.safety) } : {}),
+      },
+    },
+    conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
+  } as EvalResult;
+}
+
+/**
  * AWS Bedrock generic conversion (for simple text/chat invocations)
  * Note: Bedrock has provider-specific shapes; this handles common fields.
  */
