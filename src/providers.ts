@@ -441,6 +441,21 @@ export function convertAnthropicToEval2Otel(
     .filter((c: any) => c.type === 'tool_use')
     .map((t: any, i: number) => ({ id: `tool_${i}`, type: 'function', function: { name: t.name, arguments: t.input } }));
 
+  // Normalize safety categories
+  const safetyCats: string[] = [];
+  const safetyAny: any = (response as any).safety;
+  if (safetyAny) {
+    if (Array.isArray(safetyAny.categories)) {
+      safetyCats.push(...(safetyAny.categories as any[]).map(String));
+    } else {
+      for (const [k, v] of Object.entries<any>(safetyAny)) {
+        if (k === 'categories') continue;
+        const val = typeof v === 'object' ? (v?.flagged ?? v?.filtered ?? v?.blocked) : v;
+        if (val) safetyCats.push(k);
+      }
+    }
+  }
+
   return {
     id: evalId,
     timestamp: startTime,
@@ -476,6 +491,7 @@ export function convertAnthropicToEval2Otel(
         ...(response.safety ? { 'anthropic.safety': JSON.stringify(response.safety) } : {}),
         // Heuristic normalization
         ...(response.stop_reason === 'safety' ? { 'gen_ai.safety.flagged': true } : {}),
+        ...(safetyCats.length ? { 'gen_ai.safety.categories': safetyCats } : {}),
       },
     },
     conversation: request.messages ? {
@@ -512,6 +528,13 @@ export function convertCohereToEval2Otel(
   const evalId = options.evalId ?? `cohere-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const duration = (endTime - startTime) / 1000;
   const billed = response.meta?.billed_units ?? {};
+  // Normalize safety
+  const chSafety: any = (response as any).safety;
+  const chCats: string[] = Array.isArray(chSafety?.categories) ? chSafety.categories.map(String)
+    : Array.isArray(chSafety?.flagged_categories) ? chSafety.flagged_categories.map(String)
+    : Array.isArray(chSafety?.reasons) ? chSafety.reasons.map(String)
+    : [];
+
   return {
     id: evalId,
     timestamp: startTime,
@@ -546,6 +569,7 @@ export function convertCohereToEval2Otel(
         ...(response.finish_reason ? { 'cohere.finish_reason': response.finish_reason } : {}),
         ...(response.safety ? { 'cohere.safety': JSON.stringify(response.safety) } : {}),
         ...(typeof (response as any).safety?.flagged === 'boolean' ? { 'gen_ai.safety.flagged': (response as any).safety.flagged } : {}),
+        ...(chCats.length ? { 'gen_ai.safety.categories': chCats } : {}),
       },
     },
     conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
