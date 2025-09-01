@@ -581,3 +581,24 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Built with ❤️ by the [EvalOps](https://github.com/evalops) team**
+
+
+### Helpers: Provider autodetect + convert
+
+Use the helpers if you have provider-native request/response payloads and want to convert them programmatically without the CLI:
+
+```ts
+import { detectProvider, convertProviderToEvalResult } from 'eval2otel';
+
+// Provider-native payloads
+const request = {/* provider request */};
+const response = {/* provider response */};
+const start = Date.now();
+const end = start + 1200;
+
+const mode = detectProvider(request, response);
+const evalResult = convertProviderToEvalResult(request, response, start, end, mode);
+if (evalResult) {
+  // pass evalResult into your Eval2Otel instance
+}
+```
