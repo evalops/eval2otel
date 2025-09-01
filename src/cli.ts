@@ -38,6 +38,7 @@ export async function runCli(argv: string[]) {
   const contentCap = args['content-cap'] ? Number(args['content-cap']) : undefined;
   const providerOverride = args['provider-override'] as string | undefined;
   const providerMode = args['provider'] as string | undefined; // openai-chat | openai-compatible | anthropic | cohere | bedrock | vertex | ollama
+  const noFallback = Boolean(args['autodetect-strict'] || args['no-fallback']);
   const dryRun = Boolean(args['dry-run']);
   const withExemplars = Boolean(args['with-exemplars']);
   const redactPattern = args['redact-pattern'] as string | undefined;
@@ -93,6 +94,9 @@ export async function runCli(argv: string[]) {
           }
         }
         if (!evalResult) {
+          if (!providerMode && detected === 'unknown' && noFallback) {
+            throw new Error('Autodetect failed and fallback disabled');
+          }
           evalResult = obj as EvalResult;
           if (providerOverride) (evalResult as any).system = providerOverride;
         }
