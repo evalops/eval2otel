@@ -301,7 +301,7 @@ export function convertOpenAICompatibleToEval2Otel(
  */
 export interface OpenAIChatRequest {
   model: string;
-  messages: Array<{ role: string; content: string | null }>;
+  messages: Array<{ role: string; content: string | null | Array<{ type: string; text?: string; image_url?: unknown }> }>;
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
@@ -348,6 +348,17 @@ export function convertOpenAIChatToEval2Otel(
 ): EvalResult {
   const evalId = options.evalId ?? `openai-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const duration = (endTime - startTime) / 1000;
+  // Extract multimodal text-only content for conversation messages
+  const convMessages = request.messages?.map((m: any) => {
+    if (Array.isArray(m.content)) {
+      const text = m.content.filter((p:any)=>p?.type==='text').map((p:any)=>p.text).filter(Boolean).join('\n');
+      return { role: m.role, content: text };
+    }
+    return m;
+  });
+
+  const hasImages = request.messages?.some((m:any)=>Array.isArray(m.content) && m.content.some((p:any)=>p?.type==='image_url')) || false;
+
   return {
     id: evalId,
     timestamp: startTime,
@@ -391,9 +402,10 @@ export function convertOpenAIChatToEval2Otel(
         ...(response.system_fingerprint ? { 'openai.system_fingerprint': response.system_fingerprint } : {}),
         // Keep logprobs compact by storing only for the first choice if present
         ...(response.choices?.[0]?.logprobs ? { 'openai.choice0.logprobs': JSON.stringify(response.choices[0].logprobs) } : {}),
+        ...(hasImages ? { 'openai.request.has_images': true } : {}),
       },
     },
-    conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
+    conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: convMessages as any } : undefined,
   } as EvalResult;
 }
 
@@ -462,6 +474,8 @@ export function convertAnthropicToEval2Otel(
       attributes: {
         ...(response.stop_reason ? { 'anthropic.stop_reason': response.stop_reason } : {}),
         ...(response.safety ? { 'anthropic.safety': JSON.stringify(response.safety) } : {}),
+        // Heuristic normalization
+        ...(response.stop_reason === 'safety' ? { 'gen_ai.safety.flagged': true } : {}),
       },
     },
     conversation: request.messages ? {
@@ -531,6 +545,7 @@ export function convertCohereToEval2Otel(
       attributes: {
         ...(response.finish_reason ? { 'cohere.finish_reason': response.finish_reason } : {}),
         ...(response.safety ? { 'cohere.safety': JSON.stringify(response.safety) } : {}),
+        ...(typeof (response as any).safety?.flagged === 'boolean' ? { 'gen_ai.safety.flagged': (response as any).safety.flagged } : {}),
       },
     },
     conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
@@ -625,6 +640,31 @@ export function convertAzureOpenAIToEval2Otel(
 ): EvalResult {
   const evalId = options.evalId ?? `azure-openai-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const duration = (endTime - startTime) / 1000;
+  // Normalize safety categories/flagged from prompt_filter_results if present
+  let safetyFlagged: boolean | undefined;
+  let safetyCategories: string[] | undefined;
+  const pfr: any = (response as any).prompt_filter_results;
+  if (Array.isArray(pfr)) {
+    const cats = new Set<string>();
+    let flagged = false;
+    for (const item of pfr) {
+      const cfr = item?.content_filter_results;
+      if (cfr && typeof cfr === 'object') {
+        for (const [k, v] of Object.entries<any>(cfr)) {
+          const filtered = v?.filtered ?? v?.flagged ?? false;
+          if (filtered) {
+            flagged = true;
+            cats.add(String(k));
+          }
+        }
+      }
+      if (item?.flagged === true) flagged = true;
+      if (item?.category) cats.add(String(item.category));
+    }
+    safetyFlagged = flagged;
+    safetyCategories = Array.from(cats);
+  }
+
   return {
     id: evalId,
     timestamp: startTime,
@@ -657,7 +697,9 @@ export function convertAzureOpenAIToEval2Otel(
     provider: {
       name: 'azure.openai',
       attributes: {
-        ...(response as any).prompt_filter_results ? { 'azure.openai.prompt_filter_results': JSON.stringify((response as any).prompt_filter_results) } : {},
+        ...(pfr ? { 'azure.openai.prompt_filter_results': JSON.stringify(pfr) } : {}),
+        ...(safetyFlagged !== undefined ? { 'gen_ai.safety.flagged': safetyFlagged } : {}),
+        ...(safetyCategories && safetyCategories.length ? { 'gen_ai.safety.categories': safetyCategories } : {}),
       },
     },
     conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
@@ -694,6 +736,14 @@ export function convertVertexToEval2Otel(
       content: (c.content.parts.map(p => p.text).filter(Boolean).join('\n')) || '',
     },
   }));
+  // Normalize safety
+  const safetyRatings: any[] | undefined = (response as any).candidates?.[0]?.safetyRatings;
+  const vertexCats: string[] = Array.isArray(safetyRatings) ? safetyRatings.map((r:any)=>String(r.category)).filter(Boolean) : [];
+  let vertexFlagged: boolean | undefined;
+  if (Array.isArray(safetyRatings)) {
+    vertexFlagged = safetyRatings.some((r:any)=> r?.blocked === true || ['HIGH','VERY_HIGH'].includes(String(r?.probability || '').toUpperCase()));
+  }
+
   return {
     id: evalId,
     timestamp: startTime,
@@ -725,7 +775,9 @@ export function convertVertexToEval2Otel(
     provider: {
       name: 'google.vertex',
       attributes: {
-        ...(response as any).candidates?.[0]?.safetyRatings ? { 'google.vertex.safety_ratings': JSON.stringify((response as any).candidates[0].safetyRatings) } : {},
+        ...(safetyRatings ? { 'google.vertex.safety_ratings': JSON.stringify(safetyRatings) } : {}),
+        ...(vertexFlagged !== undefined ? { 'gen_ai.safety.flagged': vertexFlagged } : {}),
+        ...(vertexCats.length ? { 'gen_ai.safety.categories': vertexCats } : {}),
       },
     },
     conversation: request.contents ? {

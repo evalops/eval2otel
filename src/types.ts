@@ -140,7 +140,7 @@ export const EvalResultSchema = z.object({
   // Provider-specific supplemental attributes to include on spans
   provider: z.object({
     name: z.string().optional(),
-    attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+    attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])).optional(),
   }).optional(),
 });
 

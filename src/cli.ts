@@ -53,6 +53,7 @@ export async function runCli(argv: string[]) {
   const sampleRate = args['sample-rate'] ? Number(args['sample-rate']) : undefined;
   const contentCap = args['content-cap'] ? Number(args['content-cap']) : undefined;
   const providerOverride = args['provider-override'] as string | undefined;
+  const providerMode = args['provider'] as string | undefined; // openai-chat | openai-compatible | anthropic | cohere | bedrock | vertex | ollama
   const dryRun = Boolean(args['dry-run']);
   const withExemplars = Boolean(args['with-exemplars']);
   const redactPattern = args['redact-pattern'] as string | undefined;
@@ -79,19 +80,58 @@ export async function runCli(argv: string[]) {
     if (!trimmed) continue;
     try {
       const obj = JSON.parse(trimmed);
-      const evalResult: EvalResult = obj as EvalResult;
-      if (providerOverride) {
-        (evalResult as any).system = providerOverride;
+      let evalResult: EvalResult | null = null;
+      if (providerMode && obj && typeof obj === 'object' && (obj.request || obj.response)) {
+        const start = (obj.startTime as number) || Date.now();
+        const end = (obj.endTime as number) || (start + 1000);
+        const { request, response } = obj as any;
+        let prov: any;
+        try {
+          prov = await import('./providers');
+        } catch {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          prov = require('./providers');
+        }
+        switch (providerMode.toLowerCase()) {
+          case 'openai-chat':
+            evalResult = prov.convertOpenAIChatToEval2Otel(request, response, start, end);
+            break;
+          case 'openai-compatible':
+            evalResult = prov.convertOpenAICompatibleToEval2Otel(request, response, start, end, { system: 'openai' });
+            break;
+          case 'anthropic':
+            evalResult = prov.convertAnthropicToEval2Otel(request, response, start, end);
+            break;
+          case 'cohere':
+            evalResult = prov.convertCohereToEval2Otel(request, response, start, end);
+            break;
+          case 'bedrock':
+            evalResult = prov.convertBedrockToEval2Otel(request, response, start, end);
+            break;
+          case 'vertex':
+            evalResult = prov.convertVertexToEval2Otel(request, response, start, end);
+            break;
+          case 'ollama':
+            evalResult = prov.convertOllamaToEval2Otel(request, response, start);
+            break;
+          default:
+            throw new Error(`Unknown --provider value: ${providerMode}`);
+        }
+      } else {
+        evalResult = obj as EvalResult;
+        if (providerOverride && evalResult) {
+          (evalResult as any).system = providerOverride;
+        }
       }
+      if (!evalResult) throw new Error('Unable to build EvalResult from input line');
       if (dryRun) {
-        // Print minimal summary
         console.log(`TRACE eval=${evalResult.id} op=${evalResult.operation} model=${evalResult.request?.model}`);
       } else {
         eval2otel.processEvaluation(evalResult);
       }
       count++;
     } catch (e) {
-      console.error('Failed to parse line as JSON EvalResult:', e);
+      console.error('Failed to parse/process line:', e);
     }
   }
 
