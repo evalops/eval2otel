@@ -46,5 +46,29 @@ jobs:
             coverage/index.html
             coverage
 
+      - name: Generate coverage summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage/lcov.info
+          badge: true
+          format: markdown
+          output: file
+
+      - name: Publish coverage summary as PR comment
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+            path: code-coverage-results.md
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Package (dry run)
         run: npm pack --dry-run
