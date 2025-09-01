@@ -8,7 +8,7 @@ import { detectProvider, convertProviderToEvalResult } from './helpers';
 import * as fs from 'fs';
 import * as readline from 'readline';
 
-function parseArgs(argv: string[]): Record<string, string | boolean> {
+export function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];

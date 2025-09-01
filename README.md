@@ -588,7 +588,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Use the helpers if you have provider-native request/response payloads and want to convert them programmatically without the CLI:
 
 ```ts
-import { detectProvider, convertProviderToEvalResult } from 'eval2otel';
+import { detectProvider, convertProviderToEvalResult, convertAnyProvider } from 'eval2otel';
 
 // Provider-native payloads
 const request = {/* provider request */};

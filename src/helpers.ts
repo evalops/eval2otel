@@ -59,3 +59,27 @@ export function convertProviderToEvalResult(
   }
 }
 
+/**
+ * Convenience: accept a combined payload and optionally a provider mode.
+ */
+export function convertAnyProvider(payload: {
+  request: any;
+  response: any;
+  startTime: number;
+  endTime?: number;
+  provider?: ProviderMode | string;
+}): EvalResult | null {
+  const { request, response, startTime } = payload;
+  const endTime = payload.endTime ?? startTime + 1;
+  const mode = (payload.provider as ProviderMode) ?? detectProvider(request, response);
+  return convertProviderToEvalResult(request, response, startTime, endTime, mode);
+}
+
+export function isProviderKnown(mode: string | undefined): boolean {
+  if (!mode) return false;
+  return ['openai-chat','openai-compatible','anthropic','cohere','bedrock','vertex','ollama'].includes(mode as string);
+}
+
+export function listSupportedProviders(): ProviderMode[] {
+  return ['openai-chat','openai-compatible','anthropic','cohere','bedrock','vertex','ollama'];
+}

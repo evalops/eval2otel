@@ -20,4 +20,11 @@ describe('Index functions coverage', () => {
     inst.processEvaluations([mkEval('i3')]);
     await inst.shutdown();
   });
+
+  it('processEvaluationWithMetrics helper records custom metrics too', () => {
+    const inst = new Eval2Otel({ serviceName: 'svc', useSdk: false } as any);
+    const ev = mkEval('imetrics');
+    expect(() => inst.processEvaluationWithMetrics(ev, { relevance: 0.9, toxicity: 0.01 })).not.toThrow();
+  });
+
 });

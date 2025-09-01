@@ -805,12 +805,19 @@ export function convertVertexToEval2Otel(
         ...(
           Array.isArray(safetyRatings)
             ? Object.fromEntries(
-                (safetyRatings as any[])
-                  .filter((r: any) => r?.category && r?.probability)
-                  .map((r: any) => [
-                    'gen_ai.safety.severity.' + String(r.category),
-                    String(r.probability).toUpperCase(),
-                  ])
+                (safetyRatings as any[]).flatMap((r: any) => {
+                  const entries = [] as [string, string | boolean][];
+                  if (r?.category && r?.probability) {
+                    entries.push([
+                      'gen_ai.safety.severity.' + String(r.category),
+                      String(r.probability).toUpperCase(),
+                    ]);
+                  }
+                  if (r?.category && (r?.blocked === true || ['HIGH','VERY_HIGH'].includes(String(r?.probability || '').toUpperCase()))) {
+                    entries.push(['gen_ai.safety.flagged.' + String(r.category), true]);
+                  }
+                  return entries;
+                })
               )
             : {}
         ),
