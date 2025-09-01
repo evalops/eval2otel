@@ -42,7 +42,7 @@ describe('Converter agent and RAG events', () => {
       agent: {
         name: 'agent',
         steps: [
-          { name: 's1', status: 'completed', duration: 100 },
+          { name: 's1', status: 'completed', duration: 100, type: 'tool' },
           { name: 's2', status: 'failed', error: 'boom' },
         ],
       },
@@ -62,6 +62,7 @@ describe('Converter agent and RAG events', () => {
     expect(agentEvents[0].attributes['gen_ai.agent.step.index']).toBe(0);
     expect(agentEvents[0].attributes['gen_ai.agent.step.name']).toBe('s1');
     expect(agentEvents[0].attributes['gen_ai.agent.step.duration']).toBe(100);
+    expect(agentEvents[0].attributes['gen_ai.agent.step.type']).toBe('tool');
     expect(agentEvents[1].attributes['gen_ai.agent.step.error']).toBe('boom');
 
     expect(ragEvents.length).toBe(2);
@@ -70,4 +71,3 @@ describe('Converter agent and RAG events', () => {
     expect(ragEvents[1].attributes['gen_ai.rag.chunk.id']).toBe('c2');
   });
 });
-

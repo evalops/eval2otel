@@ -34,7 +34,7 @@ describe('Converter privacy and caps', () => {
     const tracer = new CapturingTracer();
     jest.spyOn(trace, 'getTracer').mockReturnValue(tracer as any);
     const conv = new Eval2OtelConverter({ serviceName: 'svc', captureContent: true, contentMaxLength: 5, markTruncatedContent: true,
-      redactMessageContent: (_content: string, info: { role: string }) => info.role === 'user' ? null : _content,
+      redactMessageContent: (_content: string, info: { role: string }) => info.role === 'user' ? null : (info.role === 'assistant' ? null : _content),
     } as any);
     const evalResult: EvalResult = JSON.parse(JSON.stringify(base));
     const span = new CapturingSpan();
@@ -48,10 +48,25 @@ describe('Converter privacy and caps', () => {
     // Redacted user content should result in fingerprint only
     expect(userEvt!.attributes!['evalops.content_sha256']).toBeDefined();
     expect(userEvt!.attributes!['gen_ai.message.content']).toBeUndefined();
-    // Assistant content truncated and typed
-    expect(asstEvt!.attributes!['gen_ai.message.content']).toBe('Hello');
-    expect(asstEvt!.attributes!['gen_ai.message.content_truncated']).toBe(true);
-    expect(asstEvt!.attributes!['gen_ai.message.content_type']).toBe('text');
+    // Assistant redacted yields fingerprint too
+    expect(asstEvt!.attributes!['evalops.content_sha256']).toBeDefined();
+    expect(asstEvt!.attributes!['gen_ai.message.content']).toBeUndefined();
+  });
+
+  it('skips events when sampleContentRate hashes above threshold', () => {
+    const tracer = new CapturingTracer();
+    jest.spyOn(trace, 'getTracer').mockReturnValue(tracer as any);
+    const conv = new Eval2OtelConverter({ serviceName: 'svc', captureContent: true, sampleContentRate: 0.0000001 } as any);
+    const evalResult: EvalResult = {
+      id: '', // empty id yields norm ~ 1.25e-6 > 1.0e-7
+      timestamp: Date.now(), model: 'gpt-4', system: 'openai', operation: 'chat',
+      request: { model: 'gpt-4' }, usage: {}, performance: { duration: 1 }, response: { choices: [{ index: 0, finishReason: 'stop', message: { role: 'assistant', content: 'hello' } }] },
+      conversation: { id: 'c', messages: [{ role: 'user', content: 'x' }] },
+    } as any;
+    const span = new CapturingSpan();
+    jest.spyOn(tracer, 'startSpan').mockReturnValue(span as any);
+    conv.convertEvalResult(evalResult);
+    expect(span.events.length).toBe(0);
   });
 
   it('caps events per span', () => {
@@ -68,5 +83,45 @@ describe('Converter privacy and caps', () => {
     jest.spyOn(tracer, 'startSpan').mockReturnValue(span as any);
     conv.convertEvalResult(evalResult);
     expect(span.events.length).toBeLessThanOrEqual(1);
+  });
+
+  it('executes mid-range sampling branch (0<rate<1) with non-empty id', () => {
+    const tracer = new CapturingTracer();
+    jest.spyOn(trace, 'getTracer').mockReturnValue(tracer as any);
+    const conv = new Eval2OtelConverter({ serviceName: 'svc', captureContent: true, sampleContentRate: 0.5 } as any);
+    const evalResult: EvalResult = {
+      id: 'abc', timestamp: Date.now(), model: 'gpt-4', system: 'openai', operation: 'chat',
+      request: { model: 'gpt-4' }, usage: {}, performance: { duration: 1 }, response: { choices: [{ index: 0, finishReason: 'stop', message: { role: 'assistant', content: 'hello' } }] },
+    } as any;
+    const span = new CapturingSpan();
+    jest.spyOn(tracer, 'startSpan').mockReturnValue(span as any);
+    conv.convertEvalResult(evalResult);
+    expect(span.events.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('truncates and types conversation text and JSON; includes toolCallId', () => {
+    const tracer = new CapturingTracer();
+    jest.spyOn(trace, 'getTracer').mockReturnValue(tracer as any);
+    const conv = new Eval2OtelConverter({ serviceName: 'svc', captureContent: true, contentMaxLength: 5, markTruncatedContent: true } as any);
+    const evalResult: EvalResult = {
+      id: 'conv', timestamp: Date.now(), model: 'gpt-4', system: 'openai', operation: 'chat',
+      request: { model: 'gpt-4' }, usage: {}, performance: { duration: 1 }, response: { choices: [{ index: 0, finishReason: 'stop', message: { role: 'assistant', content: 'ok' } }] },
+      conversation: { id: 'c1', messages: [
+        { role: 'user', content: '0123456789', toolCallId: 'tid1' },
+        { role: 'system', content: { a: '0123456789XYZ' } as any },
+      ] },
+    } as any;
+    const span = new CapturingSpan();
+    jest.spyOn(tracer, 'startSpan').mockReturnValue(span as any);
+    conv.convertEvalResult(evalResult);
+    const userEvt = span.events.find(e => e.name === 'gen_ai.user.message')!;
+    const sysEvt = span.events.find(e => e.name === 'gen_ai.system.message')!;
+    expect(userEvt!.attributes['gen_ai.message.content']).toBe('01234');
+    expect(userEvt!.attributes['gen_ai.message.content_truncated']).toBe(true);
+    expect(userEvt!.attributes['gen_ai.message.content_type']).toBe('text');
+    expect(userEvt!.attributes['gen_ai.tool.call.id']).toBe('tid1');
+    expect(sysEvt!.attributes['gen_ai.message.content_json']).toBeDefined();
+    expect(sysEvt!.attributes['gen_ai.message.content_truncated']).toBe(true);
+    expect(sysEvt!.attributes['gen_ai.message.content_type']).toBe('json');
   });
 });

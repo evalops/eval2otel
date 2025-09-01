@@ -36,4 +36,24 @@ describe('JSON content and tool argument redaction', () => {
     // Tool args redacted -> fallback to {}
     expect(tool.attributes['gen_ai.tool.arguments']).toBe('{}');
   });
+
+  it('fingerprints assistant JSON content when redacted to null', () => {
+    const tracer = new CapturingTracer();
+    jest.spyOn(trace, 'getTracer').mockReturnValue(tracer as any);
+    const conv = new Eval2OtelConverter({ serviceName: 'svc', captureContent: true,
+      redactMessageContent: () => null,
+    } as any);
+    const evalResult: EvalResult = {
+      id: 'j2', timestamp: Date.now(), model: 'gpt-4', system: 'openai', operation: 'chat',
+      request: { model: 'gpt-4' }, usage: {}, performance: { duration: 1 }, response: {
+        choices: [{ index: 0, finishReason: 'stop', message: { role: 'assistant', content: { obj: 'x' } } }],
+      },
+    } as any;
+    const span = new CapturingSpan();
+    jest.spyOn(tracer, 'startSpan').mockReturnValue(span as any);
+    conv.convertEvalResult(evalResult);
+    const asst = span.events.find(e => e.name === 'gen_ai.assistant.message');
+    expect(asst.attributes['evalops.content_sha256']).toBeDefined();
+    expect(asst.attributes['gen_ai.message.content_json']).toBeUndefined();
+  });
 });

@@ -22,5 +22,18 @@ describe('Links and provider attribute', () => {
     expect(tracer.lastOptions.links?.length).toBe(1);
     expect(tracer.lastOptions.attributes['gen_ai.provider.name']).toBe('azure.openai');
   });
-});
 
+  it('accepts Span links and {context} links', () => {
+    const tracer = new CapturingTracer();
+    jest.spyOn(trace, 'getTracer').mockReturnValue(tracer as any);
+    const conv = new Eval2OtelConverter({ serviceName: 'svc' } as any);
+    const fakeSpan = { spanContext: () => ({ traceId: 't2', spanId: 's2', traceFlags: 1 }) } as any;
+    const evalResult: EvalResult = {
+      id: 'l2', timestamp: Date.now(), model: 'gpt-4', system: 'openai', operation: 'chat',
+      request: { model: 'gpt-4' }, response: {}, usage: {}, performance: { duration: 1 },
+    } as any;
+    conv.convertEvalResult(evalResult, { links: [fakeSpan, null as any, { foo: 'bar' } as any, { context: { traceId: 't3', spanId: 's3', traceFlags: 1 } }] });
+    // null gets filtered out and does not break links mapping
+    expect(tracer.lastOptions.links?.length).toBe(2);
+  });
+});
