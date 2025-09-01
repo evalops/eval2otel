@@ -198,6 +198,33 @@ export interface OtelConfig {
   
   /** Custom resource attributes */
   resourceAttributes?: Record<string, string | number | boolean>;
+
+  /** Opt-in controls for semantic convention stability (passed through to env) */
+  semconvStabilityOptIn?: string; // e.g., "genai,stable" or provider-specific knobs
+  /** GA semconv version pin (honored if env var not set) */
+  semconvGaVersion?: string; // e.g., "1.37.0"
+
+  /** Max events per span to guard costs/cardinality */
+  maxEventsPerSpan?: number;
+
+  /** Enable metrics exemplars when a span context is active */
+  enableExemplars?: boolean;
+
+  /** Allowlist of metric attribute keys to keep (drops others if provided) */
+  metricAttributeAllowlist?: string[];
+
+  /** Maximum number of attributes attached per metric data point */
+  maxMetricAttributes?: number;
+
+  /**
+   * Advanced: Bring-your-own SDK or disable SDK setup entirely.
+   * If false, no NodeSDK will be created and only global API is used.
+   */
+  useSdk?: boolean;
+  /** Supply an already-configured NodeSDK instance to use. */
+  sdk?: unknown; // NodeSDK (kept loose here to avoid hard dep in types)
+  /** Whether Eval2Otel should start/shutdown the SDK (default: true) */
+  manageSdkLifecycle?: boolean;
 }
 
 export interface ProcessOptions {
@@ -206,6 +233,8 @@ export interface ProcessOptions {
   
   /** Parent span for context linking */
   parentSpan?: Span | SpanContext;
+  /** Optional span links to correlate related work */
+  links?: Array<Span | SpanContext | { context: SpanContext; attributes?: Record<string, unknown> }>;
   
   /** Additional attributes for this evaluation */
   attributes?: Record<string, string | number | boolean>;

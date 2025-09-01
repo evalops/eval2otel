@@ -28,11 +28,33 @@ export class Eval2Otel {
    * Initialize OpenTelemetry SDK with proper resource attributes
    */
   initialize(): void {
+    if (this.config.useSdk === false) {
+      // Honor semconv env passthrough even in no-SDK mode
+      if (!process.env.OTEL_SEMCONV_STABILITY_OPT_IN && this.config.semconvStabilityOptIn) {
+        process.env.OTEL_SEMCONV_STABILITY_OPT_IN = this.config.semconvStabilityOptIn;
+      }
+      if (!process.env.OTEL_SEMCONV_GA_VERSION && this.config.semconvGaVersion) {
+        (process.env as any).OTEL_SEMCONV_GA_VERSION = this.config.semconvGaVersion;
+      }
+      // Still allow users to set OTLP env for their own SDK
+      if (this.config.endpoint) process.env.OTEL_EXPORTER_OTLP_ENDPOINT = this.config.endpoint;
+      if (this.config.exporterProtocol) process.env.OTEL_EXPORTER_OTLP_PROTOCOL = this.config.exporterProtocol;
+      if (this.config.exporterHeaders && Object.keys(this.config.exporterHeaders).length > 0) {
+        process.env.OTEL_EXPORTER_OTLP_HEADERS = Object.entries(this.config.exporterHeaders)
+          .map(([k, v]) => `${k}=${String(v)}`).join(',');
+      }
+      return; // No SDK initialization
+    }
+    const baseResource = Resource.default();
+
+    // Determine final service.name respecting environment precedence
+    const envServiceName = process.env.OTEL_SERVICE_NAME
+      || (baseResource as any).attributes?.[SemanticResourceAttributes.SERVICE_NAME];
+    const finalServiceName = (envServiceName as string) || this.config.serviceName;
+
     const resourceAttributes: Record<string, string> = {
-      [SemanticResourceAttributes.SERVICE_NAME]: this.config.serviceName,
+      [SemanticResourceAttributes.SERVICE_NAME]: finalServiceName,
       [SemanticResourceAttributes.SERVICE_VERSION]: this.config.serviceVersion ?? '1.0.0',
-      [SemanticResourceAttributes.TELEMETRY_SDK_NAME]: 'eval2otel',
-      [SemanticResourceAttributes.TELEMETRY_SDK_VERSION]: process.env.npm_package_version ?? '0.1.0',
     };
 
     // Add environment if configured
@@ -48,7 +70,7 @@ export class Eval2Otel {
     }
 
     // Merge with default resource to preserve host/runtime attrs
-    const resource = Resource.default().merge(new Resource(resourceAttributes));
+    const resource = baseResource.merge(new Resource(resourceAttributes));
 
     const sdkConfig = {
       resource,
@@ -95,15 +117,31 @@ export class Eval2Otel {
         .join(',');
     }
 
-    this.sdk = new NodeSDK(sdkConfig);
-    this.sdk.start();
+    // Semantic convention stability env passthrough
+    if (!process.env.OTEL_SEMCONV_STABILITY_OPT_IN && this.config.semconvStabilityOptIn) {
+      process.env.OTEL_SEMCONV_STABILITY_OPT_IN = this.config.semconvStabilityOptIn;
+    }
+    if (!process.env.OTEL_SEMCONV_GA_VERSION && this.config.semconvGaVersion) {
+      // Some SDKs look for GA version pin; set if provided
+      (process.env as any).OTEL_SEMCONV_GA_VERSION = this.config.semconvGaVersion;
+    }
+
+    // Use provided SDK if supplied; otherwise create one
+    if (this.config.sdk && typeof (this.config.sdk as any).start === 'function') {
+      this.sdk = this.config.sdk as unknown as NodeSDK;
+    } else {
+      this.sdk = new NodeSDK(sdkConfig);
+    }
+    if (this.config.manageSdkLifecycle !== false) {
+      this.sdk.start();
+    }
   }
 
   /**
    * Shutdown OpenTelemetry SDK
    */
   async shutdown(): Promise<void> {
-    if (this.sdk) {
+    if (this.sdk && this.config.manageSdkLifecycle !== false) {
       await this.sdk.shutdown();
     }
   }
@@ -191,10 +229,19 @@ export { ATTR } from './attributes';
 export { 
   convertOllamaToEval2Otel, 
   convertOpenAICompatibleToEval2Otel,
+  convertBedrockToEval2Otel,
+  convertAzureOpenAIToEval2Otel,
+  convertVertexToEval2Otel,
   type OllamaResponse,
   type OllamaRequest,
   type OllamaConversionOptions,
-  type OpenAICompatibleResponse
+  type OpenAICompatibleResponse,
+  type BedrockRequest,
+  type BedrockResponse,
+  type AzureOpenAIRequest,
+  type AzureOpenAIResponse,
+  type VertexRequest,
+  type VertexResponse,
 } from './providers';
 
 // Convenience function for quick setup

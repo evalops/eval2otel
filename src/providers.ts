@@ -295,3 +295,182 @@ export function convertOpenAICompatibleToEval2Otel(
     },
   };
 }
+
+/**
+ * AWS Bedrock generic conversion (for simple text/chat invocations)
+ * Note: Bedrock has provider-specific shapes; this handles common fields.
+ */
+export interface BedrockRequest {
+  modelId: string;
+  inputText?: string;
+  messages?: Array<{ role: string; content: string }>;
+  temperature?: number; top_p?: number; top_k?: number; maxTokens?: number; stopSequences?: string[]; seed?: number;
+}
+export interface BedrockResponse {
+  modelId: string;
+  outputText?: string;
+  messages?: Array<{ role: string; content: string }>;
+  stopReason?: string;
+  usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+}
+export function convertBedrockToEval2Otel(
+  request: BedrockRequest,
+  response: BedrockResponse,
+  startTime: number,
+  endTime: number,
+  options: { evalId?: string; conversationId?: string } = {}
+): EvalResult {
+  const evalId = options.evalId ?? `bedrock-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const duration = (endTime - startTime) / 1000;
+  const content = response.outputText ?? '';
+  return {
+    id: evalId,
+    timestamp: startTime,
+    model: response.modelId,
+    system: 'aws.bedrock',
+    operation: 'chat',
+    request: {
+      model: request.modelId,
+      temperature: request.temperature,
+      topP: request.top_p,
+      topK: request.top_k,
+      maxTokens: request.maxTokens,
+      stopSequences: request.stopSequences,
+      seed: request.seed,
+      choiceCount: 1,
+    },
+    response: {
+      id: `${response.modelId}-${startTime}`,
+      model: response.modelId,
+      finishReasons: [response.stopReason ?? 'stop'],
+      choices: [{ index: 0, finishReason: response.stopReason ?? 'stop', message: { role: 'assistant', content } }],
+    },
+    usage: {
+      inputTokens: response.usage?.inputTokens,
+      outputTokens: response.usage?.outputTokens,
+      totalTokens: response.usage?.totalTokens ?? ((response.usage?.inputTokens ?? 0) + (response.usage?.outputTokens ?? 0)),
+    },
+    performance: { duration },
+    conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
+  } as EvalResult;
+}
+
+/**
+ * Azure OpenAI conversion (OpenAI-like payloads with Azure wrapper)
+ */
+export interface AzureOpenAIRequest {
+  model: string;
+  messages?: Array<{ role: string; content: string | null }>;
+  temperature?: number; max_tokens?: number; top_p?: number; frequency_penalty?: number; presence_penalty?: number; stop?: string[]; seed?: number; n?: number;
+}
+export interface AzureOpenAIResponse { 
+  id: string; created: number; model: string;
+  choices: Array<{ index: number; finish_reason: string; message: { role: string; content: string | null } }>; 
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+}
+export function convertAzureOpenAIToEval2Otel(
+  request: AzureOpenAIRequest,
+  response: AzureOpenAIResponse,
+  startTime: number,
+  endTime: number,
+  options: { evalId?: string; conversationId?: string } = {}
+): EvalResult {
+  const evalId = options.evalId ?? `azure-openai-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const duration = (endTime - startTime) / 1000;
+  return {
+    id: evalId,
+    timestamp: startTime,
+    model: response.model,
+    system: 'azure.openai',
+    operation: 'chat',
+    request: {
+      model: request.model,
+      temperature: request.temperature,
+      maxTokens: request.max_tokens,
+      topP: request.top_p,
+      frequencyPenalty: request.frequency_penalty,
+      presencePenalty: request.presence_penalty,
+      stopSequences: request.stop,
+      seed: request.seed,
+      choiceCount: request.n ?? 1,
+    },
+    response: {
+      id: response.id,
+      model: response.model,
+      finishReasons: response.choices.map(c => c.finish_reason),
+      choices: response.choices.map(c => ({ index: c.index, finishReason: c.finish_reason, message: { role: c.message.role, content: c.message.content ?? '' } })),
+    },
+    usage: {
+      inputTokens: response.usage?.prompt_tokens,
+      outputTokens: response.usage?.completion_tokens,
+      totalTokens: response.usage?.total_tokens,
+    },
+    performance: { duration },
+    conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,
+  } as EvalResult;
+}
+
+/**
+ * Google Vertex AI (Gemini) generic conversion
+ */
+export interface VertexRequest {
+  model: string;
+  contents?: Array<{ role: string; parts: Array<{ text?: string }> }>;
+  temperature?: number; topP?: number; topK?: number; maxOutputTokens?: number; stopSequences?: string[]; seed?: number;
+}
+export interface VertexResponse {
+  model: string;
+  candidates: Array<{ index?: number; finishReason?: string; content: { role: string; parts: Array<{ text?: string }> } }>;
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
+}
+export function convertVertexToEval2Otel(
+  request: VertexRequest,
+  response: VertexResponse,
+  startTime: number,
+  endTime: number,
+  options: { evalId?: string; conversationId?: string } = {}
+): EvalResult {
+  const evalId = options.evalId ?? `vertex-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const duration = (endTime - startTime) / 1000;
+  const choices = response.candidates.map((c, i) => ({
+    index: c.index ?? i,
+    finishReason: c.finishReason ?? 'stop',
+    message: {
+      role: c.content.role,
+      content: (c.content.parts.map(p => p.text).filter(Boolean).join('\n')) || '',
+    },
+  }));
+  return {
+    id: evalId,
+    timestamp: startTime,
+    model: response.model,
+    system: 'google.vertex',
+    operation: 'chat',
+    request: {
+      model: request.model,
+      temperature: request.temperature,
+      topP: request.topP,
+      topK: request.topK,
+      maxTokens: request.maxOutputTokens,
+      stopSequences: request.stopSequences,
+      seed: request.seed,
+      choiceCount: choices.length,
+    },
+    response: {
+      id: `${response.model}-${startTime}`,
+      model: response.model,
+      finishReasons: choices.map(c => c.finishReason),
+      choices,
+    },
+    usage: {
+      inputTokens: response.usageMetadata?.promptTokenCount,
+      outputTokens: response.usageMetadata?.candidatesTokenCount,
+      totalTokens: response.usageMetadata?.totalTokenCount,
+    },
+    performance: { duration },
+    conversation: request.contents ? {
+      id: options.conversationId ?? `conv-${evalId}`,
+      messages: request.contents.map(m => ({ role: m.role as any, content: (m.parts.map(p => p.text).filter(Boolean).join('\n')) || '' })),
+    } : undefined,
+  } as EvalResult;
+}

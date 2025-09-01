@@ -1,10 +1,12 @@
 import { SpanKind, SpanStatusCode, trace, Span, context } from '@opentelemetry/api';
+import { createHash } from 'crypto';
 import { EvalResult, GenAIAttributes, OtelConfig, ProcessOptions, EvalResultSchema } from './types';
 import { ATTR } from './attributes';
 
 export class Eval2OtelConverter {
   private tracer;
   private config: OtelConfig;
+  private eventCounts: WeakMap<Span, number> = new WeakMap();
 
   constructor(config: OtelConfig) {
     this.config = config;
@@ -28,10 +30,25 @@ export class Eval2OtelConverter {
       ? trace.setSpan(context.active(), options.parentSpan as Span)
       : context.active();
 
+    const links = (options?.links ?? []).map((l: any) => {
+      if (!l) return undefined;
+      if (typeof (l as any).spanContext === 'function') {
+        return { context: (l as Span).spanContext() };
+      }
+      if ((l as any).traceId && (l as any).spanId) {
+        return { context: l as any };
+      }
+      if ((l as any).context) {
+        return l as any;
+      }
+      return undefined;
+    }).filter(Boolean) as any;
+
     const span = this.tracer.startSpan(spanName, {
       kind: SpanKind.CLIENT,
       startTime,
       attributes: this.buildSpanAttributes(validated, options?.attributes),
+      links,
     }, parentContext);
 
     // Set span status based on error
@@ -151,6 +168,19 @@ export class Eval2OtelConverter {
     return content;
   }
 
+  private hashContent(content: string): string {
+    return createHash('sha256').update(content).digest('hex');
+  }
+
+  private canAddEvent(span: Span): boolean {
+    const cap = this.config.maxEventsPerSpan;
+    if (!cap || cap <= 0) return true;
+    const current = this.eventCounts.get(span) ?? 0;
+    if (current >= cap) return false;
+    this.eventCounts.set(span, current + 1);
+    return true;
+  }
+
   /**
    * Build OpenTelemetry span attributes from eval result
    */
@@ -162,6 +192,12 @@ export class Eval2OtelConverter {
       'gen_ai.operation.name': evalResult.operation,
       'gen_ai.system': evalResult.system ?? 'unknown',
     };
+
+    // Provider discriminator aligned with latest GenAI semconv
+    const provider = this.getProviderName(evalResult.system);
+    if (provider) {
+      (attributes as any)[ATTR.PROVIDER_NAME] = provider;
+    }
 
     // Add service attributes
     if (this.config.environment) {
@@ -311,6 +347,21 @@ export class Eval2OtelConverter {
   }
 
   /**
+   * Normalize provider names for gen_ai.provider.name
+   */
+  private getProviderName(system?: string): string | undefined {
+    if (!system) return undefined;
+    const s = system.toLowerCase();
+    if (s.includes('azure')) return 'azure.openai';
+    if (s.includes('bedrock') || s.includes('aws')) return 'aws.bedrock';
+    if (s.includes('vertex') || s.includes('gemini') || s.includes('google')) return 'google.vertex';
+    if (s.includes('anthropic') || s.includes('claude')) return 'anthropic';
+    if (s.includes('openai')) return 'openai';
+    // Keep explicit systems such as "ollama" or custom identifiers
+    return s;
+  }
+
+  /**
    * Add conversation message events to span
    */
   private addConversationEvents(span: Span, evalResult: EvalResult): void {
@@ -320,24 +371,51 @@ export class Eval2OtelConverter {
       const eventName = `gen_ai.${message.role}.message`;
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
+        [ATTR.PROVIDER_NAME]: this.getProviderName(evalResult.system) ?? 'unknown',
         [ATTR.MESSAGE_ROLE]: message.role,
         [ATTR.MESSAGE_INDEX]: index,
       };
 
-      if (message.content) {
-        const contentStr = typeof message.content === 'string' 
-          ? message.content 
-          : JSON.stringify(message.content);
-        const redactedContent = this.redactMessageContent(contentStr, message.role);
-        if (redactedContent !== null) {
-          const max = this.config.contentMaxLength;
-          if (typeof max === 'number' && max > 0 && redactedContent.length > max) {
-            attributes[ATTR.MESSAGE_CONTENT] = redactedContent.slice(0, max);
-            if (this.config.markTruncatedContent) {
+      if (message.content !== undefined) {
+        if (typeof message.content === 'string') {
+          const original = message.content;
+          const redacted = this.redactMessageContent(original, message.role);
+          if (redacted !== null) {
+            const max = this.config.contentMaxLength;
+            let val = redacted;
+            let truncated = false;
+            if (typeof max === 'number' && max > 0 && redacted.length > max) {
+              val = redacted.slice(0, max);
+              truncated = true;
+            }
+            attributes[ATTR.MESSAGE_CONTENT] = val;
+            attributes[ATTR.MESSAGE_CONTENT_TYPE] = 'text';
+            if (truncated && this.config.markTruncatedContent) {
               attributes[ATTR.MESSAGE_CONTENT_TRUNCATED] = true;
             }
           } else {
-            attributes[ATTR.MESSAGE_CONTENT] = redactedContent;
+            // Content was redacted entirely; attach fingerprint
+            attributes[ATTR.CONTENT_SHA256] = this.hashContent(original);
+          }
+        } else {
+          // Structured JSON-like content
+          const jsonStr = JSON.stringify(message.content);
+          const redacted = this.redactMessageContent(jsonStr, message.role);
+          if (redacted !== null) {
+            const max = this.config.contentMaxLength;
+            let val = redacted;
+            let truncated = false;
+            if (typeof max === 'number' && max > 0 && redacted.length > max) {
+              val = redacted.slice(0, max);
+              truncated = true;
+            }
+            attributes[ATTR.MESSAGE_CONTENT_JSON] = val;
+            attributes[ATTR.MESSAGE_CONTENT_TYPE] = 'json';
+            if (truncated && this.config.markTruncatedContent) {
+              attributes[ATTR.MESSAGE_CONTENT_TRUNCATED] = true;
+            }
+          } else {
+            attributes[ATTR.CONTENT_SHA256] = this.hashContent(jsonStr);
           }
         }
       }
@@ -346,7 +424,9 @@ export class Eval2OtelConverter {
         attributes[ATTR.TOOL_CALL_ID] = message.toolCallId;
       }
 
-      span.addEvent(eventName, attributes);
+      if (this.canAddEvent(span)) {
+        span.addEvent(eventName, attributes);
+      }
     });
   }
 
@@ -359,25 +439,50 @@ export class Eval2OtelConverter {
     evalResult.response.choices.forEach((choice) => {
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
+        [ATTR.PROVIDER_NAME]: this.getProviderName(evalResult.system) ?? 'unknown',
         [ATTR.RESPONSE_CHOICE_INDEX]: choice.index,
         [ATTR.RESPONSE_FINISH_REASON]: choice.finishReason,
         [ATTR.MESSAGE_ROLE]: choice.message.role,
       };
 
-      if (choice.message.content) {
-        const contentStr = typeof choice.message.content === 'string'
-          ? choice.message.content
-          : JSON.stringify(choice.message.content);
-        const redactedContent = this.redactMessageContent(contentStr, choice.message.role);
-        if (redactedContent !== null) {
-          const max = this.config.contentMaxLength;
-          if (typeof max === 'number' && max > 0 && redactedContent.length > max) {
-            attributes[ATTR.MESSAGE_CONTENT] = redactedContent.slice(0, max);
-            if (this.config.markTruncatedContent) {
+      if (choice.message.content !== undefined) {
+        if (typeof choice.message.content === 'string') {
+          const original = choice.message.content;
+          const redacted = this.redactMessageContent(original, choice.message.role);
+          if (redacted !== null) {
+            const max = this.config.contentMaxLength;
+            let val = redacted;
+            let truncated = false;
+            if (typeof max === 'number' && max > 0 && redacted.length > max) {
+              val = redacted.slice(0, max);
+              truncated = true;
+            }
+            attributes[ATTR.MESSAGE_CONTENT] = val;
+            attributes[ATTR.MESSAGE_CONTENT_TYPE] = 'text';
+            if (truncated && this.config.markTruncatedContent) {
               attributes[ATTR.MESSAGE_CONTENT_TRUNCATED] = true;
             }
           } else {
-            attributes[ATTR.MESSAGE_CONTENT] = redactedContent;
+            attributes[ATTR.CONTENT_SHA256] = this.hashContent(original);
+          }
+        } else {
+          const jsonStr = JSON.stringify(choice.message.content);
+          const redacted = this.redactMessageContent(jsonStr, choice.message.role);
+          if (redacted !== null) {
+            const max = this.config.contentMaxLength;
+            let val = redacted;
+            let truncated = false;
+            if (typeof max === 'number' && max > 0 && redacted.length > max) {
+              val = redacted.slice(0, max);
+              truncated = true;
+            }
+            attributes[ATTR.MESSAGE_CONTENT_JSON] = val;
+            attributes[ATTR.MESSAGE_CONTENT_TYPE] = 'json';
+            if (truncated && this.config.markTruncatedContent) {
+              attributes[ATTR.MESSAGE_CONTENT_TRUNCATED] = true;
+            }
+          } else {
+            attributes[ATTR.CONTENT_SHA256] = this.hashContent(jsonStr);
           }
         }
       }
@@ -388,7 +493,8 @@ export class Eval2OtelConverter {
           const rawArgs = typeof toolCall.function.arguments === 'string'
             ? toolCall.function.arguments
             : JSON.stringify(toolCall.function.arguments);
-          span.addEvent('gen_ai.tool.message', {
+          if (this.canAddEvent(span)) {
+            span.addEvent('gen_ai.tool.message', {
             'gen_ai.system': evalResult.system ?? 'unknown',
             [ATTR.TOOL_NAME]: toolCall.function.name,
             [ATTR.TOOL_CALL_ID]: toolCall.id,
@@ -400,11 +506,14 @@ export class Eval2OtelConverter {
                 toolCall.id
               ) ?? '{}'
             ),
-          });
+            });
+          }
         });
       }
 
-      span.addEvent('gen_ai.assistant.message', attributes);
+      if (this.canAddEvent(span)) {
+        span.addEvent('gen_ai.assistant.message', attributes);
+      }
     });
   }
 
@@ -431,7 +540,9 @@ export class Eval2OtelConverter {
         attributes['gen_ai.agent.step.error'] = step.error;
       }
 
-      span.addEvent('gen_ai.agent.step', attributes);
+      if (this.canAddEvent(span)) {
+        span.addEvent('gen_ai.agent.step', attributes);
+      }
     });
   }
 
@@ -454,7 +565,9 @@ export class Eval2OtelConverter {
         attributes['gen_ai.rag.chunk.tokens'] = chunk.tokens;
       }
 
-      span.addEvent('gen_ai.rag.chunk', attributes);
+      if (this.canAddEvent(span)) {
+        span.addEvent('gen_ai.rag.chunk', attributes);
+      }
     });
   }
 }

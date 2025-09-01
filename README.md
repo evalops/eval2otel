@@ -20,15 +20,15 @@ Modern AI applications need robust observability to understand performance, qual
 
 ## Features
 
-- 🔍 **OpenTelemetry GenAI Compliance**: Fully compliant with OpenTelemetry semantic conventions for generative AI
+- 🔍 **OpenTelemetry GenAI Compliance**: Aligns with latest GenAI semconv and emits `gen_ai.provider.name`
 - 📊 **Comprehensive Metrics**: Tracks token usage, latency, and custom quality metrics
 - 🎯 **Rich Spans & Events**: Creates detailed spans with conversation and choice events
 - 🛠️ **Tool Support**: Full support for AI tool execution and function calling
 - 🤖 **Agent & Workflow Tracking**: Monitor multi-step AI agent executions and complex workflows
 - 📚 **RAG Support**: Specialized metrics for Retrieval-Augmented Generation pipelines
-- 🔒 **Privacy Controls**: Opt-in content capturing for sensitive data
+- 🔒 **Privacy Controls**: Opt-in content capturing, truncation flags, and SHA-256 fingerprints when redacted
 - 📈 **Custom Metrics**: Support for evaluation-specific metrics like accuracy, BLEU, ROUGE
-- 🦙 **Ollama Integration**: Built-in converters for Ollama's native and OpenAI-compatible APIs
+- 🦙 **Provider Integrations**: Converters for Ollama, OpenAI-compatible, Azure OpenAI, AWS Bedrock, and Google Vertex
 
 ## Installation
 
@@ -107,6 +107,9 @@ eval2otel includes built-in converters for popular AI providers:
 - **OpenAI** - GPT models, embeddings, and tools
 - **Anthropic** - Claude models and function calling
 - **Ollama** - Local LLMs with `convertOllamaToEval2Otel()` and `convertOpenAICompatibleToEval2Otel()`
+- **Azure OpenAI** - `convertAzureOpenAIToEval2Otel()`
+- **AWS Bedrock** - `convertBedrockToEval2Otel()` (generic mapping)
+- **Google Vertex AI (Gemini)** - `convertVertexToEval2Otel()`
 - **Custom** - Any provider following the `EvalResult` schema
 
 See the [examples directory](./examples/) for provider-specific integration guides.
@@ -214,6 +217,7 @@ The library creates spans following the `{operation} {model}` naming convention 
 
 - `gen_ai.operation.name`: The operation type (chat, embeddings, execute_tool)
 - `gen_ai.system`: The AI system (openai, anthropic, etc.)
+- `gen_ai.provider.name`: Provider discriminator (`openai`, `anthropic`, `aws.bedrock`, `azure.openai`, `google.vertex`, `ollama`)
 - `gen_ai.request.model`: Model name
 - `gen_ai.request.temperature`: Temperature setting
 - `gen_ai.usage.input_tokens`: Input token count
@@ -228,6 +232,12 @@ When content capture is enabled (and operational metadata emission is on), the l
 - `gen_ai.assistant.message`: Assistant responses
 - `gen_ai.tool.message`: Tool call results
 
+Event attributes preserve structure and mark truncation:
+- `gen_ai.message.content_type`: `text` or `json`
+- `gen_ai.message.content` or `gen_ai.message.content_json`: Preserves content (truncated by `contentMaxLength`)
+- `gen_ai.message.content_truncated=true` when truncation occurred
+- `evalops.content_sha256`: Content fingerprint when redaction removed content
+
 ### Metrics
 Automatically recorded metrics include:
 
@@ -236,6 +246,8 @@ Automatically recorded metrics include:
 - `gen_ai.server.time_to_first_token`: Time to first token
 - `gen_ai.server.time_per_output_token`: Time per output token
 - Custom evaluation metrics (accuracy, BLEU, etc.)
+
+Streaming support: record TTFT and inter-token timings when provided (client or server streaming).
 
 ## Configuration
 
@@ -250,6 +262,15 @@ Key configuration options:
 
 See [TypeScript definitions](./dist/types.d.ts) for complete `OtelConfig` interface.
 
+Advanced options:
+- `enableExemplars`: Attach exemplars (trace_id/span_id) to histograms when a span is active
+- `metricAttributeAllowlist`: Keep only the listed metric attribute keys
+- `maxMetricAttributes`: Cap attributes recorded per metric data point
+- `maxEventsPerSpan`: Cap events added to a span (cost/cardinality guard)
+- `semconvStabilityOptIn`, `semconvGaVersion`: Pass-through to env (`OTEL_SEMCONV_*`) to pin semconv behavior
+- `useSdk=false`: No-SDK mode, emit via global API only
+- `sdk`, `manageSdkLifecycle`: Bring-your-own SDK and control lifecycle
+
 
 ## OpenTelemetry Compliance
 
@@ -260,6 +281,11 @@ Key telemetry generated:
 - **Events**: User/assistant/tool messages with content (when enabled)
 - **Metrics**: Token usage, operation duration, custom quality scores
 - **Attributes**: Model, temperature, tokens, finish reasons, etc.
+
+Resource & semconv behavior:
+- Merges `Resource.default()` with your configured attributes; honors `OTEL_SERVICE_NAME` precedence.
+- Lets the SDK set `telemetry.sdk.*` attributes; you set `service.name`, `service.version`, `service.namespace`, `service.instance.id` as appropriate.
+- Supports `OTEL_SEMCONV_*` env via `semconvStabilityOptIn` / `semconvGaVersion` for forward-compatibility.
 
 ## Privacy & Security
 
@@ -278,6 +304,10 @@ const eval2otel = createEval2Otel({
 ```
 
 Additional privacy controls available in the [configuration options](#configuration).
+
+Redaction behavior:
+- If your redaction hook returns `null`, content is removed and `evalops.content_sha256` is attached for deduplication.
+- If your redaction hook returns a string, that value is emitted (and may be truncated with `gen_ai.message.content_truncated=true`).
 
 ## Backend Integration
 
@@ -371,6 +401,26 @@ See the `examples/` directory for complete working examples:
 - [`ollama-basic.js`](./examples/ollama-basic.js) - Basic Ollama integration
 - [`ollama-real-test.js`](./examples/ollama-real-test.js) - Real Ollama instance testing
 - [`ollama-integration.md`](./examples/ollama-integration.md) - Complete Ollama guide
+
+### CLI: JSONL → OTLP
+
+Replay evaluations from a JSONL file into your OTLP endpoint:
+
+```bash
+npx eval2otel-cli ingest \
+  --file ./evals.jsonl \
+  --service-name evalops-evals \
+  --endpoint http://localhost:4317 \
+  --protocol grpc \
+  --with-exemplars \
+  --sample-rate 1.0 \
+  --content-cap 4000 \
+  --redact-pattern "\\b\\d{16}\\b"
+```
+
+Flags:
+- `--dry-run` prints a summary without emitting telemetry
+- `--provider-override` forces `system`/`gen_ai.provider.name` on all records
 
 ## OpenTelemetry Compatibility
 

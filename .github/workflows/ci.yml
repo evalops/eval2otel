@@ -35,7 +35,16 @@ jobs:
         run: npx tsc --noEmit
       
       - name: Test
-        run: npm test
+        run: npm test -- --coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.node-version }}
+          path: |
+            coverage/lcov.info
+            coverage/index.html
+            coverage
 
       - name: Package (dry run)
         run: npm pack --dry-run
