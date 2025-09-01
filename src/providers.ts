@@ -492,6 +492,7 @@ export function convertAnthropicToEval2Otel(
         // Heuristic normalization
         ...(response.stop_reason === 'safety' ? { 'gen_ai.safety.flagged': true } : {}),
         ...(safetyCats.length ? { 'gen_ai.safety.categories': safetyCats } : {}),
+        ...Object.fromEntries(safetyCats.map((c) => ['gen_ai.safety.flagged.' + String(c), true])),
       },
     },
     conversation: request.messages ? {
@@ -570,6 +571,7 @@ export function convertCohereToEval2Otel(
         ...(response.safety ? { 'cohere.safety': JSON.stringify(response.safety) } : {}),
         ...(typeof (response as any).safety?.flagged === 'boolean' ? { 'gen_ai.safety.flagged': (response as any).safety.flagged } : {}),
         ...(chCats.length ? { 'gen_ai.safety.categories': chCats } : {}),
+        ...Object.fromEntries(chCats.map((c) => ['gen_ai.safety.flagged.' + String(c), true])),
       },
     },
     conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,

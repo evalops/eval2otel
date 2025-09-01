@@ -112,7 +112,7 @@ eval2otel includes built-in converters for popular AI providers:
 - **Google Vertex AI (Gemini)** - `convertVertexToEval2Otel()`
 - **Custom** - Any provider following the `EvalResult` schema
 
-See the [examples directory](./examples/) for provider-specific integration guides.
+See the [examples directory](./examples/) for provider-specific integration guides and helper-based conversion examples.
 
 ## Supported Operations
 
@@ -210,7 +210,7 @@ const ragEval: EvalResult = {
 };
 ```
 
-## Generated OpenTelemetry Data
+## Telemetry Model
 
 ### Spans
 The library creates spans following the `{operation} {model}` naming convention with these attributes:
