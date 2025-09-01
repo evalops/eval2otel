@@ -272,6 +272,15 @@ Advanced options:
 - `sdk`, `manageSdkLifecycle`: Bring-your-own SDK and control lifecycle
 
 
+
+## Safety Normalization
+
+When providers include safety results, eval2otel normalizes common fields:
+- `gen_ai.safety.flagged`: true/false when content was flagged/blocked (if available)
+- `gen_ai.safety.categories`: string[] of categories (e.g., HATE, SELF_HARM)
+
+Provider-specific raw payloads are preserved (e.g., `azure.openai.prompt_filter_results`, `google.vertex.safety_ratings`, `anthropic.safety`, `cohere.safety`) for debugging and vendor parity.
+
 ## OpenTelemetry Compliance
 
 eval2otel follows [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) for spans, events, and metrics.
@@ -421,6 +430,9 @@ npx eval2otel-cli ingest \
 Flags:
 - `--dry-run` prints a summary without emitting telemetry
 - `--provider-override` forces `system`/`gen_ai.provider.name` on all records
+- `--provider <mode>` converts provider-native request/response lines to EvalResult and emits them. Modes:
+  - `openai-chat`, `openai-compatible`, `anthropic`, `cohere`, `bedrock`, `vertex`, `ollama`
+  - Without `--provider`, the CLI tries to auto-detect provider shapes (OpenAI native, OpenAI-compatible, Anthropic, Cohere, Bedrock, Vertex, Ollama); otherwise falls back to plain EvalResult.
 
 ## OpenTelemetry Compatibility
 
