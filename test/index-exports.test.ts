@@ -20,6 +20,17 @@ describe('Package exports', () => {
     expect(pkg.convertProviderToEvalResult).toBeDefined();
     expect(pkg.convertProviderWithEvidence).toBeDefined();
     expect(pkg.convertAnyProvider).toBeDefined();
+    expect(pkg.ATTRIBUTE_REGISTRY).toBeDefined();
+    expect(pkg.assertRegisteredAttributes).toBeDefined();
+    expect(pkg.collectUnknownAttributes({ 'unknown.attr': true })).toEqual(['unknown.attr']);
+    expect(pkg.isRegisteredAttribute('gen_ai.provider.name')).toBe(true);
+    expect(pkg.PROVIDER_ADAPTER_MODES).toContain('openai-chat');
+    expect(pkg.createProviderAdapter).toBeDefined();
+    expect(pkg.isKnownProviderAdapterMode('openai-chat')).toBe(true);
+    expect(pkg.deriveRagMetrics).toBeDefined();
+    expect(pkg.getRagMetricValue).toBeDefined();
+    expect(pkg.convertPromptfooResult).toBeDefined();
+    expect(pkg.convertPromptfooToEvalResults).toBeDefined();
     expect(pkg.convertOllamaToEval2Otel).toBeDefined();
     expect(pkg.convertOpenAICompatibleToEval2Otel).toBeDefined();
     expect(pkg.convertBedrockToEval2Otel).toBeDefined();

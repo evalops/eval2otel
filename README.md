@@ -1,426 +1,394 @@
 # Eval2Otel
 
-[![npm version](https://badge.fury.io/js/eval2otel.svg)](https://badge.fury.io/js/eval2otel) [![codecov](https://codecov.io/gh/evalops/eval2otel/branch/main/graph/badge.svg)](https://codecov.io/gh/evalops/eval2otel)
+[![npm version](https://badge.fury.io/js/eval2otel.svg)](https://badge.fury.io/js/eval2otel)
+[![codecov](https://codecov.io/gh/evalops/eval2otel/branch/main/graph/badge.svg)](https://codecov.io/gh/evalops/eval2otel)
 [![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](http://www.typescriptlang.org/)
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-GenAI%20Conventions-blue)](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A comprehensive TypeScript library that converts AI evaluation results to **OpenTelemetry GenAI semantic conventions** for complete observability and monitoring of your AI systems.
+Eval2Otel turns AI evaluation results and provider-native payloads into
+OpenTelemetry GenAI spans, events, metrics, and audit attributes. It is built
+for eval pipelines that need production observability without leaking prompt
+content by default.
 
-## 🎯 Why Eval2Otel?
+## What You Get
 
-Modern AI applications need robust observability to understand performance, quality, and behavior. Eval2Otel bridges the gap between your AI evaluation data and industry-standard OpenTelemetry telemetry, enabling:
+- OpenTelemetry GenAI spans: `gen_ai.chat`, `gen_ai.embeddings`, `gen_ai.execute_tool`, `gen_ai.agent`, and `gen_ai.workflow`
+- Provider adapters for OpenAI chat, OpenAI-compatible APIs, Anthropic, Cohere, AWS Bedrock, Google Vertex, and Ollama
+- Promptfoo result conversion with run, case, dataset, score, assertion, provenance, and evidence metadata
+- RAG scoring for context precision, recall, faithfulness, MRR, NDCG, citation coverage, top-k relevance, and context-token use
+- Privacy controls for opt-in content capture, redaction-to-string, redaction-to-fingerprint, truncation flags, and event caps
+- A versioned `eval2otel.v1` contract backed by conformance fixtures
+- Operational telemetry about Eval2Otel itself: conversion count, warnings, dropped events, redactions, truncations, and duration
+- A Python contract scaffold for teams that want the same Eval2Otel payload shape outside TypeScript
 
-- **🔍 Complete AI Pipeline Visibility** - Track every evaluation from input to output
-- **📊 Standardized Metrics** - Use OpenTelemetry's semantic conventions for consistency
-- **🚀 Production Monitoring** - Monitor AI quality and performance in real-time
-- **🛡️ Privacy Controls** - Opt-in content capture with built-in data protection
-- **⚡ Zero-Config Setup** - Works out of the box with any OpenTelemetry backend
-- **🦙 Local LLM Support** - Native integration with Ollama for local model observability
-
-## Features
-
-- 🔍 **OpenTelemetry GenAI Compliance**: Aligns with latest GenAI semconv and emits `gen_ai.provider.name`
-- 📊 **Comprehensive Metrics**: Tracks token usage, latency, and custom quality metrics
-- 🎯 **Rich Spans & Events**: Creates detailed spans with conversation and choice events
-- 🛠️ **Tool Support**: Full support for AI tool execution and function calling
-- 🤖 **Agent & Workflow Tracking**: Monitor multi-step AI agent executions and complex workflows
-- 📚 **RAG Support**: Specialized metrics for Retrieval-Augmented Generation pipelines
-- 🔒 **Privacy Controls**: Opt-in content capturing, truncation flags, and SHA-256 fingerprints when redacted
-- 📈 **Custom Metrics**: Support for evaluation-specific metrics like accuracy, BLEU, ROUGE
-- 🦙 **Provider Integrations**: Converters for Ollama, OpenAI-compatible, Azure OpenAI, AWS Bedrock, and Google Vertex
-
-## Installation
+## Install
 
 ```bash
 npm install eval2otel
 ```
 
-**Requirements:**
-- Node.js 16+ (ESM and CommonJS supported)
-- TypeScript 4.5+ (for TypeScript projects)
+Requirements:
+
+- Node.js 16+
+- TypeScript 5+ for TypeScript projects
+- An OpenTelemetry collector or SDK if you want to export telemetry immediately
 
 ## Quick Start
 
-```typescript
-import { createEval2Otel, EvalResult } from 'eval2otel';
+```ts
+import { createEval2Otel, type EvalResult } from 'eval2otel';
 
-// Initialize the library
 const eval2otel = createEval2Otel({
-  serviceName: 'my-ai-service',
+  serviceName: 'eval-runner',
   serviceVersion: '1.0.0',
-  captureContent: true, // Enable content capture (opt-in)
+  captureContent: false,
+  endpoint: 'http://localhost:4318',
+  exporterProtocol: 'http/protobuf',
 });
 
-// Define your evaluation result
-const evalResult: EvalResult = {
-  id: 'eval-123',
+const result: EvalResult = {
+  id: 'case-123',
   timestamp: Date.now(),
-  model: 'gpt-4',
+  model: 'gpt-4o-mini',
   system: 'openai',
   operation: 'chat',
-  
   request: {
-    model: 'gpt-4',
-    temperature: 0.7,
-    maxTokens: 1000,
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
   },
-  
   response: {
-    id: 'resp-456',
+    id: 'resp-123',
     finishReasons: ['stop'],
     choices: [{
       index: 0,
       finishReason: 'stop',
       message: {
         role: 'assistant',
-        content: 'Hello! How can I help you today?',
+        content: 'The answer is grounded in the supplied release notes.',
       },
     }],
   },
-  
   usage: {
-    inputTokens: 15,
-    outputTokens: 12,
+    inputTokens: 120,
+    outputTokens: 18,
   },
-  
   performance: {
-    duration: 1.5, // seconds
+    duration: 0.82,
+  },
+  provenance: {
+    sourceFramework: 'promptfoo',
+    runId: 'nightly-2026-05-18',
+    caseId: 'case-123',
+    datasetId: 'release-evals',
+    datasetVersion: '2026.05',
   },
 };
 
-// Process the evaluation
-eval2otel.processEvaluation(evalResult);
-
-// Or process with quality metrics
-eval2otel.processEvaluationWithMetrics(evalResult, {
-  accuracy: 0.95,
-  relevance: 0.88,
-  toxicity: 0.02,
-});
+eval2otel.processEvaluation(result);
+await eval2otel.shutdown();
 ```
 
-## Provider Support
+Content capture is off by default. You still get model, timing, token, contract,
+provider, provenance, and conversion telemetry without storing prompts or
+responses.
 
-eval2otel includes built-in converters for popular AI providers:
+## Contract, Provenance, And Evidence
 
-- **OpenAI** - GPT models, embeddings, and tools
-- **Anthropic** - Claude models and function calling
-- **Ollama** - Local LLMs with `convertOllamaToEval2Otel()` and `convertOpenAICompatibleToEval2Otel()`
-- **Azure OpenAI** - `convertAzureOpenAIToEval2Otel()`
-- **AWS Bedrock** - `convertBedrockToEval2Otel()` (generic mapping)
-- **Google Vertex AI (Gemini)** - `convertVertexToEval2Otel()`
-- **Custom** - Any provider following the `EvalResult` schema
+Eval2Otel emits a stable contract namespace alongside GenAI semantic convention
+attributes:
 
-See the [examples directory](./examples/) for provider-specific integration guides and helper-based conversion examples.
+- `evalops.contract.version`
+- `evalops.semconv.version`
+- `evalops.eval.id`
+- `evalops.source.framework`
+- `evalops.run.id`
+- `evalops.case.id`
+- `evalops.dataset.id`
+- `evalops.adapter.name`
+- `evalops.raw_payload_sha256`
+- `evalops.warning_count`
+- `evalops.redacted_content_count`
+- `evalops.truncated_content_count`
+- `evalops.dropped_event_count`
 
-## Supported Operations
+The contract is documented in
+[docs/contract/eval2otel-v1.md](./docs/contract/eval2otel-v1.md) and enforced by
+golden fixtures in [test/fixtures/conformance](./test/fixtures/conformance).
+Those fixtures include normal chat, RAG event caps, tool argument truncation,
+redaction-to-fingerprint, and oversized payload cases.
 
-### Chat Completions
-```typescript
-const chatEval: EvalResult = {
-  operation: 'chat',
-  // ... other fields
-  conversation: {
-    id: 'conv-123',
-    messages: [
-      { role: 'system', content: 'You are a helpful assistant.' },
-      { role: 'user', content: 'Hello!' },
-      { role: 'assistant', content: 'Hi there!' },
-    ],
-  },
-};
-```
+## Provider Adapters
 
-### Tool Execution
-```typescript
-const toolEval: EvalResult = {
-  operation: 'execute_tool',
-  // ... other fields
-  tool: {
-    name: 'get_weather',
-    description: 'Get current weather',
-    callId: 'call_123',
+Use provider adapters when you have raw provider request and response payloads
+instead of an `EvalResult` already shaped by your evaluation framework.
+
+```ts
+import { convertProviderWithEvidence } from 'eval2otel';
+
+const converted = convertProviderWithEvidence({
+  provider: 'openai-chat',
+  startTime: Date.now(),
+  endTime: Date.now() + 950,
+  request: {
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: 'hi' }],
   },
   response: {
+    object: 'chat.completion',
+    id: 'chatcmpl-1',
+    model: 'gpt-4o-mini',
     choices: [{
-      message: {
-        role: 'assistant',
-        toolCalls: [{
-          id: 'call_123',
-          type: 'function',
-          function: {
-            name: 'get_weather',
-            arguments: { location: 'SF' },
-          },
-        }],
-      },
+      index: 0,
+      finish_reason: 'stop',
+      message: { role: 'assistant', content: 'hello' },
     }],
   },
-};
+});
+
+if (converted.evalResult) {
+  eval2otel.processEvaluation(converted.evalResult);
+}
 ```
 
-### Embeddings
-```typescript
-const embeddingEval: EvalResult = {
-  operation: 'embeddings',
-  // ... other fields
-};
+Supported adapter modes:
+
+- `openai-chat`
+- `openai-compatible`
+- `anthropic`
+- `cohere`
+- `bedrock`
+- `vertex`
+- `ollama`
+
+Every adapter result includes structured warnings and raw payload evidence
+hashes, so conversion failures can be reported without dumping raw payloads.
+
+## Promptfoo Adapter
+
+Promptfoo results can be converted directly into Eval2Otel results:
+
+```ts
+import { convertPromptfooToEvalResults } from 'eval2otel';
+
+const { evalResults, warnings } = convertPromptfooToEvalResults(promptfooJson, {
+  runId: 'promptfoo-nightly',
+  datasetId: 'support-evals',
+  datasetVersion: '2026.05',
+  defaultSystem: 'promptfoo',
+});
+
+for (const result of evalResults) {
+  eval2otel.processEvaluation(result);
+}
+
+if (warnings.length > 0) {
+  console.warn(warnings);
+}
 ```
 
-### AI Agent Execution
-```typescript
-const agentEval: EvalResult = {
-  operation: 'agent_execution',
-  // ... other fields
-  agent: {
-    name: 'research-agent',
-    type: 'orchestrator',
-    plan: 'search -> analyze -> summarize',
-    reasoning: 'Multi-source information gathering required',
-    steps: [
-      { name: 'search', status: 'completed', duration: 2000 },
-      { name: 'analyze', status: 'completed', duration: 3500 },
-      { name: 'summarize', status: 'running', duration: null }
-    ]
-  }
-};
-```
+The adapter preserves Promptfoo success, score, assertion counts, failed
+assertion warnings, metric names, run identity, case identity, and payload
+hashes.
 
-### RAG (Retrieval-Augmented Generation)
-```typescript
+## RAG Telemetry
+
+RAG payloads can include retrieval inputs, chunk metadata, explicit eval scores,
+and derived ranking metrics:
+
+```ts
 const ragEval: EvalResult = {
+  id: 'rag-case-1',
+  timestamp: Date.now(),
+  model: 'gpt-4o-mini',
+  system: 'azure-openai',
   operation: 'chat',
-  // ... other fields
+  request: { model: 'gpt-4o-mini' },
+  response: {},
+  usage: {},
+  performance: { duration: 1.1 },
   rag: {
     retrievalMethod: 'hybrid',
-    documentsRetrieved: 10,
-    documentsUsed: 3,
+    dataSourceId: 'kb-prod',
+    query: 'what shipped?',
+    documentsRetrieved: 3,
+    documentsUsed: 2,
+    contextWindowTokens: 8192,
+    contextTruncated: false,
+    chunkSize: 512,
+    overlapSize: 64,
     chunks: [
-      { id: 'doc1_chunk3', source: 'manual.pdf', relevanceScore: 0.92, position: 0, tokens: 256 },
-      { id: 'doc2_chunk1', source: 'faq.md', relevanceScore: 0.87, position: 1, tokens: 189 }
+      {
+        id: 'release-1',
+        source: 'release-notes.md',
+        relevanceScore: 0.92,
+        position: 0,
+        tokens: 220,
+        used: true,
+        citationId: 'cite-1',
+      },
+      {
+        id: 'contract-1',
+        source: 'contract.md',
+        relevanceScore: 0.86,
+        position: 1,
+        tokens: 180,
+      },
     ],
     metrics: {
       contextPrecision: 0.88,
       contextRecall: 0.91,
       answerRelevance: 0.93,
-      faithfulness: 0.95
-    }
-  }
-};
-```
-
-## Telemetry Model
-
-### Spans
-The library creates operation-centric spans such as `gen_ai.chat`, `gen_ai.embeddings`, and `gen_ai.execute_tool` with these attributes:
-
-- `gen_ai.operation.name`: The operation type (chat, embeddings, execute_tool)
-- `gen_ai.system`: The AI system (openai, anthropic, etc.)
-- `gen_ai.provider.name`: Provider discriminator (`openai`, `anthropic`, `aws.bedrock`, `azure.openai`, `google.vertex`, `ollama`)
-- `evalops.contract.version`: Eval2Otel telemetry contract version
-- `evalops.eval.id`: Stable evaluation identifier
-- `gen_ai.request.model`: Model name
-- `gen_ai.request.temperature`: Temperature setting
-- `gen_ai.usage.input_tokens`: Input token count
-- `gen_ai.usage.output_tokens`: Output token count
-- And many more following OpenTelemetry conventions
-
-### Events
-When content capture is enabled (and operational metadata emission is on), the library adds events for:
-
-- `gen_ai.system.message`: System instructions
-- `gen_ai.user.message`: User inputs  
-- `gen_ai.assistant.message`: Assistant responses
-- `gen_ai.tool.message`: Tool call results
-
-Event attributes preserve structure and mark truncation:
-- `gen_ai.message.content_type`: `text` or `json`
-- `gen_ai.message.content` or `gen_ai.message.content_json`: Preserves content (truncated by `contentMaxLength`)
-- `gen_ai.message.content_truncated=true` when truncation occurred
-- `evalops.content_sha256`: Content fingerprint when redaction removed content
-
-### Metrics
-Automatically recorded metrics include:
-
-- `gen_ai.client.token.usage`: Token usage histogram
-- `gen_ai.client.operation.duration`: Operation duration
-- `gen_ai.server.time_to_first_token`: Time to first token
-- `gen_ai.server.time_per_output_token`: Time per output token
-- `eval2otel.conversion.count`: Eval2Otel conversion attempts by status
-- `eval2otel.conversion.warning_count`: Conversion warnings for SLO gates
-- `eval2otel.conversion.dropped_event_count`: Operational events dropped by caps
-- `eval2otel.conversion.redacted_content_count`: Content fields redacted during conversion
-- Custom evaluation metrics (accuracy, BLEU, etc.)
-
-Streaming support: record TTFT and inter-token timings when provided (client or server streaming).
-
-### Contract, Provenance, And Evidence
-
-Eval2Otel publishes a versioned telemetry contract in [docs/contract/eval2otel-v1.md](./docs/contract/eval2otel-v1.md). The contract is backed by golden fixtures in `test/fixtures/conformance` so provider and framework adapters cannot drift silently.
-
-`EvalResult` accepts optional `provenance` and `evidence` metadata for audit joins:
-
-```typescript
-const evalResult: EvalResult = {
-  id: 'case-123',
-  timestamp: Date.now(),
-  model: 'gpt-4o-mini',
-  system: 'openai',
-  operation: 'chat',
-  request: { model: 'gpt-4o-mini' },
-  response: {},
-  usage: {},
-  performance: { duration: 0.8 },
-  provenance: {
-    sourceFramework: 'promptfoo',
-    runId: 'run-2026-05-18',
-    caseId: 'case-123',
-    datasetId: 'evalops-core',
-    datasetVersion: '2026.05',
-  },
-  evidence: {
-    rawPayloadSha256: '...',
-    promptSha256: '...',
-    responseSha256: '...',
+      faithfulness: 0.95,
+    },
   },
 };
 ```
 
-## Configuration
+Eval2Otel derives these when not provided explicitly:
 
-Key configuration options:
+- `gen_ai.rag.mean_reciprocal_rank`
+- `gen_ai.rag.ndcg`
+- `gen_ai.rag.citation_coverage`
+- `gen_ai.rag.retrieval_used_ratio`
+- `gen_ai.rag.top_k_relevance_mean`
+- `gen_ai.rag.top_k_relevance_min`
+- `gen_ai.rag.context_tokens_used`
 
-- **serviceName** (required) - Your service identifier
-- **captureContent** - Opt-in for message content capture (default: false)
-- **sampleContentRate** - Content sampling rate 0.0-1.0
-- **redact** - Custom redaction function for PII
-- **endpoint** - OpenTelemetry collector endpoint
-- **exporterProtocol** - 'grpc' | 'http/protobuf' | 'http/json'
+The raw RAG query is hashed into `gen_ai.rag.query_sha256`; it is not emitted as
+plain text.
 
-See [TypeScript definitions](./dist/types.d.ts) for complete `OtelConfig` interface.
+## Semantic Convention Registry
 
-Advanced options:
-- `enableExemplars`: Attach exemplars (trace_id/span_id) to histograms when a span is active
-- `metricAttributeAllowlist`: Keep only the listed metric attribute keys
-- `maxMetricAttributes`: Cap attributes recorded per metric data point
-- `maxEventsPerSpan`: Cap events added to a span (cost/cardinality guard)
-- `semconvStabilityOptIn`, `semconvGaVersion`: Pass-through to env (`OTEL_SEMCONV_*`) to pin semconv behavior
-- `useSdk=false`: No-SDK mode, emit via global API only
-- `sdk`, `manageSdkLifecycle`: Bring-your-own SDK and control lifecycle
+The package exports a registry for attributes Eval2Otel owns, forwards, or
+intentionally treats as compatible with OpenTelemetry GenAI and OpenLLMetry-style
+RAG naming:
 
+```ts
+import {
+  ATTRIBUTE_REGISTRY,
+  assertRegisteredAttributes,
+  collectUnknownAttributes,
+  isRegisteredAttribute,
+} from 'eval2otel';
 
-
-
-
-#### Provider Replay Examples
-
-Each line contains a provider-native `{ request, response, startTime, endTime }` JSON object:
-
-- OpenAI native chat
-```jsonl
-{"startTime": 1725170000000, "endTime": 1725170001200, "request": {"model": "gpt-4o", "messages": [{"role":"user","content":"hi"}]}, "response": {"id":"id","object":"chat.completion","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}}
-```
-Replay: `npx eval2otel-cli ingest --file openai.jsonl --provider openai-chat`
-
-- OpenAI-compatible
-```jsonl
-{"startTime": 1725170000000, "endTime": 1725170001000, "request": {"model":"gpt-4o"}, "response": {"id":"id","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"ok","tool_calls":[{"id":"t","type":"function","function":{"name":"f","arguments":"{"x":1}"}}]},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}}
-```
-Replay: `npx eval2otel-cli ingest --file openai-compat.jsonl --provider openai-compatible`
-
-- Anthropic
-```jsonl
-{"startTime": 1725170000000, "endTime": 1725170001400, "request": {"model":"claude-3"}, "response": {"id":"a1","model":"claude-3","content":[{"type":"text","text":"hi"}],"stop_reason":"stop"}}
-```
-Replay: `npx eval2otel-cli ingest --file anthropic.jsonl --provider anthropic`
-
-- Cohere
-```jsonl
-{"startTime": 1725170000000, "endTime": 1725170000500, "request": {"model":"command-r"}, "response": {"id":"c1","model":"command-r","text":"ok","finish_reason":"COMPLETE","meta":{"billed_units":{"input_tokens":1,"output_tokens":2}}}}
-```
-Replay: `npx eval2otel-cli ingest --file cohere.jsonl --provider cohere`
-
-- AWS Bedrock
-```jsonl
-{"startTime": 1725170000000, "endTime": 1725170000800, "request": {"modelId":"anthropic.claude-3"}, "response": {"modelId":"anthropic.claude-3","outputText":"ok","stopReason":"end_turn"}}
-```
-Replay: `npx eval2otel-cli ingest --file bedrock.jsonl --provider bedrock`
-
-- Google Vertex
-```jsonl
-{"startTime": 1725170000000, "endTime": 1725170000600, "request": {"model":"gemini-1.5"}, "response": {"model":"gemini-1.5","candidates":[{"content":{"role":"assistant","parts":[{"text":"ok"}]}}]}}
-```
-Replay: `npx eval2otel-cli ingest --file vertex.jsonl --provider vertex`
-
-- Ollama
-```jsonl
-{"startTime": 1725170000000, "request": {"model":"llama3"}, "response": {"model":"llama3","created_at":"2024-08-01T00:00:00Z","message":{"role":"assistant","content":"ok"},"done":true}}
-```
-Replay: `npx eval2otel-cli ingest --file ollama.jsonl --provider ollama`
-
-## Safety Normalization
-
-When providers include safety results, eval2otel normalizes common fields:
-- `gen_ai.safety.flagged`: true/false when content was flagged/blocked (if available)
-- `gen_ai.safety.categories`: string[] of categories (e.g., HATE, SELF_HARM)
-
-Provider-specific raw payloads are preserved (e.g., `azure.openai.prompt_filter_results`, `google.vertex.safety_ratings`, `anthropic.safety`, `cohere.safety`) for debugging and vendor parity.
-
-## OpenTelemetry Compliance
-
-eval2otel follows [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) for spans, events, and metrics.
-
-Key telemetry generated:
-- **Spans**: `gen_ai.chat`, `gen_ai.embeddings`, `gen_ai.execute_tool`
-- **Events**: User/assistant/tool messages with content (when enabled)
-- **Metrics**: Token usage, operation duration, custom quality scores
-- **Attributes**: Model, temperature, tokens, finish reasons, etc.
-
-Resource & semconv behavior:
-- Merges `Resource.default()` with your configured attributes; honors `OTEL_SERVICE_NAME` precedence.
-- Lets the SDK set `telemetry.sdk.*` attributes; you set `service.name`, `service.version`, `service.namespace`, `service.instance.id` as appropriate.
-- Supports `OTEL_SEMCONV_*` env via `semconvStabilityOptIn` / `semconvGaVersion` for forward-compatibility.
-
-## Privacy & Security
-
-By default, message content is **not captured** to protect sensitive data. Enable content capture only when appropriate:
-
-```typescript
-const eval2otel = createEval2Otel({
-  serviceName: 'my-service',
-  captureContent: false, // Default: content not captured
-  sampleContentRate: 0.1, // Sample 10% of content when enabled
-  redact: (content) => {
-    // Custom redaction for PII
-    return content.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL]');
-  },
+assertRegisteredAttributes({
+  'gen_ai.provider.name': 'openai',
+  'evalops.contract.version': 'eval2otel.v1',
 });
 ```
 
-Additional privacy controls available in the [configuration options](#configuration).
+Use this in adapter tests to catch new attribute names before they ship. See
+[docs/semconv-mapping.md](./docs/semconv-mapping.md) for the registry policy.
 
-Redaction behavior:
-- If your redaction hook returns `null`, content is removed and `evalops.content_sha256` is attached for deduplication.
-- If your redaction hook returns a string, that value is emitted (and may be truncated with `gen_ai.message.content_truncated=true`).
+## Privacy And Safety Controls
 
-## Backend Integration
+Eval2Otel assumes captured content is sensitive:
 
-eval2otel works with any OpenTelemetry-compatible backend. See [Backend Integration Guide](./docs/backends.md) for specific setup instructions for:
+- `captureContent` defaults to `false`
+- `sampleContentRate` gates content capture when enabled
+- `contentMaxLength` caps emitted text
+- `markTruncatedContent` emits `gen_ai.message.content_truncated=true`
+- `maxEventsPerSpan` caps high-cardinality event emission
+- `redact`, `redactMessageContent`, and `redactToolArguments` can replace or remove content
 
-- **Grafana Stack** (Tempo + Loki + Mimir)
-- **Honeycomb** 
-- **Datadog**
-- **New Relic**
-- **Jaeger**
-- **AWS X-Ray**
+If a redaction hook returns `null`, Eval2Otel omits the content and emits
+`evalops.content_sha256` instead. If it returns a string, that string is emitted
+and then capped by `contentMaxLength`.
 
-### Quick OTLP Setup
+```ts
+const eval2otel = createEval2Otel({
+  serviceName: 'eval-runner',
+  captureContent: true,
+  contentMaxLength: 4000,
+  markTruncatedContent: true,
+  redact: content => /sk-live-|BEGIN_PRIVATE_KEY/.test(content) ? null : content,
+});
+```
 
-For local development with Jaeger:
+Adversarial fixtures for redaction and payload caps are documented in
+[docs/security/adversarial-fixtures.md](./docs/security/adversarial-fixtures.md).
+
+## CLI
+
+Replay JSONL records into OTLP:
 
 ```bash
-# Start Jaeger with OTLP support
+npx eval2otel-cli ingest \
+  --file ./evals.jsonl \
+  --service-name evalops-evals \
+  --endpoint http://localhost:4318 \
+  --protocol http/protobuf \
+  --provider openai-chat \
+  --content-cap 4000 \
+  --redact-pattern "\\b\\d{16}\\b"
+```
+
+Useful flags:
+
+- `--dry-run` validates and prints a summary without emitting telemetry
+- `--provider <mode>` converts provider-native request/response JSONL
+- `--provider-override <name>` forces `system` and `gen_ai.provider.name`
+- `--autodetect-strict` fails unknown provider-native shapes instead of falling back
+- `--with-exemplars` records active trace/span exemplars on metrics
+
+Each provider-native line should look like:
+
+```json
+{"startTime":1725170000000,"endTime":1725170001200,"request":{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]},"response":{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4o-mini","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}}
+```
+
+## Python Scaffold
+
+The TypeScript package is the production emitter today. The Python directory
+contains a small contract-first scaffold with the same `eval2otel.v1`
+provenance/evidence/report vocabulary:
+
+```bash
+PYTHONPATH=python python3 -m unittest discover -s python/tests
+```
+
+```python
+from eval2otel import Eval2Otel
+
+client = Eval2Otel(service_name="pytest", semconv_version="1.37.0")
+report = client.process_evaluation({
+    "id": "py-case-1",
+    "model": "gpt-4o-mini",
+    "operation": "chat",
+    "request": {"model": "gpt-4o-mini"},
+    "response": {},
+    "performance": {"duration": 0.5},
+})
+
+assert report.contract_version == "eval2otel.v1"
+```
+
+See [python/README.md](./python/README.md).
+
+## Configuration
+
+Common options:
+
+- `serviceName`: required OpenTelemetry service name
+- `serviceVersion`: optional service version
+- `environment`: deployment environment attribute
+- `endpoint`: OTLP endpoint
+- `exporterProtocol`: `grpc`, `http/protobuf`, or `http/json`
+- `exporterHeaders`: OTLP headers
+- `tracesEndpoint`, `metricsEndpoint`, `logsEndpoint`: signal-specific endpoints
+- `captureContent`, `sampleContentRate`, `contentMaxLength`: content controls
+- `enableExemplars`: attach trace/span exemplars to metrics when active
+- `metricAttributeAllowlist`, `maxMetricAttributes`: metric cardinality controls
+- `semconvStabilityOptIn`, `semconvGaVersion`: pass-through semantic convention controls
+- `useSdk=false`: no-SDK mode, using global OpenTelemetry APIs only
+- `sdk`, `manageSdkLifecycle`: bring your own SDK and lifecycle handling
+
+## Backend Setup
+
+Eval2Otel works with any OTLP-compatible backend. For local development:
+
+```bash
 docker run -d --name jaeger \
   -p 16686:16686 \
   -p 4317:4317 \
@@ -428,337 +396,55 @@ docker run -d --name jaeger \
   jaegertracing/all-in-one:latest \
   --collector.otlp.enabled=true
 
-# Set environment variables
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 ```
 
-Then visit http://localhost:16686 to see your traces.
+Then open `http://localhost:16686` and search for your configured
+`serviceName`.
 
-### Starter Dashboards
+See [docs/backends.md](./docs/backends.md) for Grafana, Honeycomb, Datadog, New
+Relic, Jaeger, and AWS X-Ray notes. Dashboard starters live in
+[dashboards](./dashboards).
 
-Pre-built dashboard templates are available in the `dashboards/` directory:
-- `grafana-dashboard.json` - Grafana dashboard with quality metrics, performance, and cost analysis
-- `datadog-dashboard.json` - Datadog dashboard with SLO tracking and safety metrics
+## Development
 
-Import these into your monitoring platform for instant visibility into your AI evaluation metrics.
-
-## Quality Metrics
-
-Track evaluation-specific metrics:
-
-```typescript
-eval2otel.processEvaluationWithMetrics(evalResult, {
-  accuracy: 0.95,      // Classification accuracy
-  precision: 0.92,     // Precision score
-  recall: 0.88,        // Recall score
-  f1Score: 0.90,       // F1 score
-  bleuScore: 0.85,     // BLEU score for text generation
-  rougeScore: 0.82,    // ROUGE score for summarization
-  toxicity: 0.02,      // Toxicity score (lower is better)
-  relevance: 0.94,     // Relevance score
-});
+```bash
+npm install
+npm run lint
+npm run build
+npm test -- --coverage
+npm audit --omit=dev
+PYTHONPATH=python python3 -m unittest discover -s python/tests
 ```
 
-## Advanced Usage
-
-### Custom Metrics
-```typescript
-const metrics = eval2otel.getMetrics();
-const customCounter = metrics.createEvalCounter(
-  'custom_failures',
-  'Number of custom evaluation failures'
-);
-customCounter.add(1, { 'eval.type': 'custom' });
-```
-
-### Batch Processing
-```typescript
-const evalResults: EvalResult[] = [/* ... */];
-eval2otel.processEvaluations(evalResults);
-```
-
-### Graceful Shutdown
-```typescript
-process.on('SIGTERM', async () => {
-  await eval2otel.shutdown();
-  process.exit(0);
-});
-```
+The CI matrix runs lint, build, type-check, coverage, and package dry-run on
+Node 18, 20, and 22.
 
 ## Examples
 
-See the `examples/` directory for complete working examples:
-
-- [`basic-usage.ts`](./examples/basic-usage.ts) - Simple chat completion evaluation
-- [`tool-execution.ts`](./examples/tool-execution.ts) - Tool/function calling evaluation
-- [`agent-workflow.ts`](./examples/agent-workflow.ts) - Agent execution and RAG evaluation
-- [`ollama-basic.js`](./examples/ollama-basic.js) - Basic Ollama integration
-- [`ollama-real-test.js`](./examples/ollama-real-test.js) - Real Ollama instance testing
-- [`ollama-integration.md`](./examples/ollama-integration.md) - Complete Ollama guide
-
-### CLI: JSONL → OTLP
-
-Replay evaluations from a JSONL file into your OTLP endpoint:
-
-```bash
-npx eval2otel-cli ingest \
-  --file ./evals.jsonl \
-  --service-name evalops-evals \
-  --endpoint http://localhost:4317 \
-  --protocol grpc \
-  --with-exemplars \
-  --sample-rate 1.0 \
-  --content-cap 4000 \
-  --redact-pattern "\\b\\d{16}\\b"
-```
-
-Flags:
-- `--dry-run` prints a summary without emitting telemetry
-- `--provider-override` forces `system`/`gen_ai.provider.name` on all records
-- `--provider <mode>` converts provider-native request/response lines to EvalResult and emits them. Modes:
-  - `openai-chat`, `openai-compatible`, `anthropic`, `cohere`, `bedrock`, `vertex`, `ollama`
-  - Without `--provider`, the CLI tries to auto-detect provider shapes (OpenAI native, OpenAI-compatible, Anthropic, Cohere, Bedrock, Vertex, Ollama); otherwise falls back to plain EvalResult.
-
-## OpenTelemetry Compatibility
-
-This library implements the OpenTelemetry Semantic Conventions for Generative AI:
-
-- [GenAI Spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/)
-- [GenAI Events](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-events/)  
-- [GenAI Metrics](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-metrics/)
-
-## 🏗️ Architecture
-
-Eval2Otel follows OpenTelemetry's semantic conventions and creates structured telemetry data:
-
-```mermaid
-graph TB
-    A[AI Evaluation Results] --> B[Eval2Otel]
-    B --> C[OpenTelemetry Spans]
-    B --> D[OpenTelemetry Events]
-    B --> E[OpenTelemetry Metrics]
-    
-    C --> F[Observability Backend]
-    D --> F
-    E --> F
-    
-    F --> G[Jaeger]
-    F --> H[Prometheus]
-    F --> I[Grafana]
-    F --> J[Custom Dashboard]
-```
-
-### Generated Telemetry
-
-| Type | Purpose | Examples |
-|------|---------|----------|
-| **Spans** | Operation tracking | `chat gpt-4`, `embeddings text-ada-002` |
-| **Events** | Conversation flow | `gen_ai.user.message`, `gen_ai.assistant.message` |
-| **Metrics** | Performance & usage | `gen_ai.client.token.usage`, `eval.accuracy` |
-
-## API Reference
-
-### Core API
-- `createEval2Otel(config)` - Initialize with OpenTelemetry SDK
-- `processEvaluation(evalResult, options?)` - Process single evaluation
-- `processEvaluations(evalResults[], options?)` - Batch process
-
-### Provider Converters
-- `convertOllamaToEval2Otel()` - Convert Ollama native responses
-- `convertOpenAICompatibleToEval2Otel()` - Convert OpenAI-compatible responses
-
-Full API documentation available in [TypeScript definitions](./dist/index.d.ts).
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
-
-```bash
-git clone https://github.com/evalops/eval2otel.git
-cd eval2otel
-npm install
-npm run build
-npm test
-```
-
-### Running Examples
-
-```bash
-# Basic usage example
-npx ts-node examples/basic-usage.ts
-
-# Tool execution example  
-npx ts-node examples/tool-execution.ts
-```
-
-## 📋 Requirements
-
-- Node.js 16+
-- TypeScript 5+
-- OpenTelemetry SDK
-
-## 🔗 Related Projects
-
-- [OpenTelemetry JavaScript](https://github.com/open-telemetry/opentelemetry-js)
-- [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
-- [EvalOps](https://github.com/evalops) - AI Evaluation Operations
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- OpenTelemetry community for the semantic conventions
-- TypeScript team for excellent tooling
-- All contributors who help improve AI observability
-
----
-
-**Built with ❤️ by the [EvalOps](https://github.com/evalops) team**
-
-
-### Helpers: Provider autodetect + convert
-
-Use the helpers if you have provider-native request/response payloads and want to convert them programmatically without the CLI:
-
-```ts
-import { detectProvider, convertProviderToEvalResult, convertAnyProvider } from 'eval2otel';
-
-// Provider-native payloads
-const request = {/* provider request */};
-const response = {/* provider response */};
-const start = Date.now();
-const end = start + 1200;
-
-const mode = detectProvider(request, response);
-const evalResult = convertProviderToEvalResult(request, response, start, end, mode);
-if (evalResult) {
-  // pass evalResult into your Eval2Otel instance
-}
-```
-
+- [examples/basic-usage.ts](./examples/basic-usage.ts)
+- [examples/tool-execution.ts](./examples/tool-execution.ts)
+- [examples/agent-workflow.ts](./examples/agent-workflow.ts)
+- [examples/helpers-convert.ts](./examples/helpers-convert.ts)
+- [examples/provider-openai-chat.ts](./examples/provider-openai-chat.ts)
+- [examples/provider-openai-compat.ts](./examples/provider-openai-compat.ts)
+- [examples/provider-anthropic.ts](./examples/provider-anthropic.ts)
+- [examples/provider-cohere.ts](./examples/provider-cohere.ts)
+- [examples/provider-bedrock.ts](./examples/provider-bedrock.ts)
+- [examples/provider-vertex.ts](./examples/provider-vertex.ts)
+- [examples/provider-ollama.ts](./examples/provider-ollama.ts)
+- [examples/ollama-integration.md](./examples/ollama-integration.md)
 
 ## Troubleshooting
 
-- Provider-native payloads: If CLI autodetect fails, specify `--provider` or use the helpers to convert programmatically. See example scripts:
-  - `examples/provider-openai-chat.ts`
-  - `examples/provider-openai-compat.ts`
-  - `examples/provider-anthropic.ts`
-  - `examples/provider-cohere.ts`
-  - `examples/provider-bedrock.ts`
-  - `examples/provider-vertex.ts`
-  - `examples/provider-ollama.ts`
-- OTLP exporter mismatch: Ensure `--protocol` matches your collector (`grpc` vs `http/protobuf`) and the endpoint uses the right port/path.
-- Service name precedence: `OTEL_SERVICE_NAME` overrides configured `serviceName`. Set one or the other, not both.
-- No content captured: `captureContent` defaults to false; enable it and ensure sampling/redaction don’t drop content.
-- Unknown provider in CLI: pass `--provider <mode>` or use `--autodetect-strict` to fail fast instead of falling back.
+- Unknown provider payload: pass `--provider <mode>` or use `--autodetect-strict`
+- No content events: set `captureContent=true` and check sampling/redaction hooks
+- Too many events: set `maxEventsPerSpan` and inspect `evalops.dropped_event_count`
+- OTLP export mismatch: align `exporterProtocol` with your collector port and path
+- Service name surprise: `OTEL_SERVICE_NAME` takes precedence over configured `serviceName`
+- Semconv drift: assert adapter attributes with `assertRegisteredAttributes`
 
+## License
 
-## Provider Payload Shapes (Minimal)
-
-Below are minimal request/response shapes used by the built-in converters. Real payloads often include additional fields.
-
-- OpenAI (Chat Completions)
-```json
-{
-  "request": { "model": "gpt-4o", "messages": [{ "role": "user", "content": "hi" }] },
-  "response": {
-    "id": "chatcmpl-1",
-    "object": "chat.completion",
-    "model": "gpt-4o",
-    "choices": [{ "index": 0, "message": { "role": "assistant", "content": "ok" }, "finish_reason": "stop" }],
-    "usage": { "prompt_tokens": 3, "completion_tokens": 5, "total_tokens": 8 }
-  }
-}
-```
-
-- OpenAI-compatible
-```json
-{
-  "request": { "model": "gpt-4o" },
-  "response": {
-    "id": "id",
-    "model": "gpt-4o",
-    "choices": [{
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "ok",
-        "tool_calls": [{ "id": "t", "type": "function", "function": { "name": "f", "arguments": "{"x":1}" } }]
-      },
-      "finish_reason": "stop"
-    }],
-    "usage": { "prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3 }
-  }
-}
-```
-
-- Anthropic (Messages)
-```json
-{
-  "request": { "model": "claude-3", "messages": [{ "role": "user", "content": [{ "type": "text", "text": "hi" }] }] },
-  "response": {
-    "id": "a1",
-    "model": "claude-3",
-    "content": [ { "type": "text", "text": "ok" }, { "type": "tool_use", "name": "search", "input": { "q": "x" } } ],
-    "stop_reason": "tool_use",
-    "usage": { "input_tokens": 1, "output_tokens": 2, "total_tokens": 3 }
-  }
-}
-```
-
-- Cohere (Chat)
-```json
-{
-  "request": { "model": "command-r" },
-  "response": {
-    "id": "c1",
-    "model": "command-r",
-    "text": "ok",
-    "finish_reason": "COMPLETE",
-    "meta": { "billed_units": { "input_tokens": 1, "output_tokens": 2, "total_tokens": 3 } },
-    "safety": { "flagged": false }
-  }
-}
-```
-
-- AWS Bedrock (Generic)
-```json
-{
-  "request": { "modelId": "anthropic.claude-3" },
-  "response": { "modelId": "anthropic.claude-3", "outputText": "ok", "stopReason": "end_turn" }
-}
-```
-
-- Google Vertex (Gemini)
-```json
-{
-  "request": { "model": "gemini-1.5", "contents": [{ "role": "user", "parts": [{ "text": "hi" }] }] },
-  "response": {
-    "model": "gemini-1.5",
-    "candidates": [{ "content": { "role": "assistant", "parts": [{ "text": "ok" }] }, "safetyRatings": [{ "category": "HATE", "probability": "LOW" }] }],
-    "usageMetadata": { "promptTokenCount": 1, "candidatesTokenCount": 2, "totalTokenCount": 3 }
-  }
-}
-```
-
-- Ollama
-```json
-{
-  "request": { "model": "llama3" },
-  "response": {
-    "model": "llama3",
-    "created_at": "2024-08-01T00:00:00Z",
-    "message": { "role": "assistant", "content": "ok" },
-    "done": true,
-    "total_duration": 1000000000,
-    "load_duration": 100000000,
-    "eval_count": 10,
-    "eval_duration": 500000000
-  }
-}
-```
+MIT. See [LICENSE](./LICENSE).

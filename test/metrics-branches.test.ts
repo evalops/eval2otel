@@ -39,6 +39,11 @@ describe('Metrics recording branches', () => {
       agent: { name: 'agent', steps: [{ name: 's1', status: 'completed', duration: 100 }] },
       rag: {
         documentsRetrieved: 2,
+        documentsUsed: 1,
+        chunks: [
+          { id: 'c1', source: 'a.md', relevanceScore: 0.4, position: 0, tokens: 12 },
+          { id: 'c2', source: 'b.md', relevanceScore: 0.9, position: 1, tokens: 20, used: true, citationId: 'cite-2' },
+        ],
         metrics: { contextPrecision: 0.8, contextRecall: 0.9, answerRelevance: 0.95, faithfulness: 0.9 },
       },
     } as any;
@@ -53,6 +58,9 @@ describe('Metrics recording branches', () => {
       'gen_ai.server.time_to_first_token',
       'gen_ai.server.time_per_output_token',
       'gen_ai.agent.step_duration',
+      'gen_ai.rag.mean_reciprocal_rank',
+      'gen_ai.rag.ndcg',
+      'gen_ai.rag.context_tokens_used',
       'eval.accuracy',
       'eval.latency',
     ]));
@@ -61,6 +69,9 @@ describe('Metrics recording branches', () => {
     expect(tokenHist.records.length).toBe(2);
     const accHist = fakeMeter.histograms.get('eval.accuracy')!;
     expect(accHist.records[0].value).toBe(0.9);
+    const mrrHist = fakeMeter.histograms.get('gen_ai.rag.mean_reciprocal_rank')!;
+    expect(mrrHist.records[0].value).toBe(0.5);
+    const contextTokenHist = fakeMeter.histograms.get('gen_ai.rag.context_tokens_used')!;
+    expect(contextTokenHist.records[0].value).toBe(20);
   });
 });
-

@@ -10,6 +10,8 @@ class CapturingSpan implements Span {
   setStatus() { return this; }
   setAttribute(key: string, value: unknown) { this.attributes[key] = value; return this; }
   setAttributes(attrs: Record<string, unknown>) { Object.assign(this.attributes, attrs); return this; }
+  addLink() { return this; }
+  addLinks() { return this; }
   recordException() { return this; }
   end() {}
   // unused interface members

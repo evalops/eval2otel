@@ -6,7 +6,9 @@ import {
   buildConversionReport,
   buildEval2OtelAttributes,
   normalizeProviderName,
+  sha256,
 } from './contract';
+import { deriveRagMetrics, getRagMetricValue } from './rag';
 
 export class Eval2OtelConverter {
   private tracer;
@@ -373,6 +375,29 @@ export class Eval2OtelConverter {
       if (evalResult.rag.retrievalMethod) {
         attributes['gen_ai.rag.retrieval_method'] = evalResult.rag.retrievalMethod;
       }
+      if (evalResult.rag.dataSourceId) {
+        attributes[ATTR.DATA_SOURCE_ID] = evalResult.rag.dataSourceId;
+      }
+      if (evalResult.rag.query) {
+        attributes[ATTR.RAG_QUERY_SHA256] = sha256(evalResult.rag.query);
+      }
+      if (evalResult.rag.contextWindowTokens !== undefined) {
+        attributes[ATTR.RAG_CONTEXT_WINDOW_TOKENS] = evalResult.rag.contextWindowTokens;
+      }
+      const derivedRag = deriveRagMetrics(evalResult.rag);
+      const contextTokensUsed = evalResult.rag.contextTokensUsed ?? derivedRag.contextTokensUsed;
+      if (contextTokensUsed !== undefined) {
+        attributes[ATTR.RAG_CONTEXT_TOKENS_USED] = contextTokensUsed;
+      }
+      if (evalResult.rag.contextTruncated !== undefined) {
+        attributes[ATTR.RAG_CONTEXT_TRUNCATED] = evalResult.rag.contextTruncated;
+      }
+      if (evalResult.rag.chunkSize !== undefined) {
+        attributes[ATTR.RAG_CHUNK_SIZE] = evalResult.rag.chunkSize;
+      }
+      if (evalResult.rag.overlapSize !== undefined) {
+        attributes[ATTR.RAG_OVERLAP_SIZE] = evalResult.rag.overlapSize;
+      }
       if (evalResult.rag.documentsRetrieved !== undefined) {
         attributes['gen_ai.rag.documents_retrieved'] = evalResult.rag.documentsRetrieved;
       }
@@ -393,6 +418,12 @@ export class Eval2OtelConverter {
           attributes['gen_ai.rag.faithfulness'] = evalResult.rag.metrics.faithfulness;
         }
       }
+      this.addOptionalNumber(attributes, ATTR.RAG_MRR, getRagMetricValue(evalResult.rag, 'meanReciprocalRank'));
+      this.addOptionalNumber(attributes, ATTR.RAG_NDCG, getRagMetricValue(evalResult.rag, 'ndcg'));
+      this.addOptionalNumber(attributes, ATTR.RAG_CITATION_COVERAGE, getRagMetricValue(evalResult.rag, 'citationCoverage'));
+      this.addOptionalNumber(attributes, ATTR.RAG_RETRIEVAL_USED_RATIO, getRagMetricValue(evalResult.rag, 'retrievalUsedRatio'));
+      this.addOptionalNumber(attributes, ATTR.RAG_TOP_K_RELEVANCE_MEAN, getRagMetricValue(evalResult.rag, 'topKRelevanceMean'));
+      this.addOptionalNumber(attributes, ATTR.RAG_TOP_K_RELEVANCE_MIN, getRagMetricValue(evalResult.rag, 'topKRelevanceMin'));
     }
 
     // Provider-supplied attributes passthrough (already namespaced)
@@ -406,6 +437,12 @@ export class Eval2OtelConverter {
     }
 
     return attributes;
+  }
+
+  private addOptionalNumber(attributes: GenAIAttributes, key: string, value: number | undefined): void {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      attributes[key] = value;
+    }
   }
 
   /**
@@ -615,6 +652,15 @@ export class Eval2OtelConverter {
 
       if (chunk.tokens !== undefined) {
         attributes['gen_ai.rag.chunk.tokens'] = chunk.tokens;
+      }
+      if (chunk.used !== undefined) {
+        attributes[ATTR.RAG_CHUNK_USED] = chunk.used;
+      }
+      if (chunk.citationId) {
+        attributes[ATTR.RAG_CHUNK_CITATION_ID] = chunk.citationId;
+      }
+      if (chunk.evidenceSha256) {
+        attributes[ATTR.RAG_CHUNK_EVIDENCE_SHA256] = chunk.evidenceSha256;
       }
 
       if (this.canAddEvent(span)) {

@@ -1,9 +1,9 @@
 import { EvalResult } from './types';
 import {
-  EVAL2OTEL_CONTRACT_VERSION,
   sha256,
 } from './contract';
 import { ConversionWarning, ProviderConversionResult } from './types';
+import { createProviderAdapter, isKnownProviderAdapterMode, PROVIDER_ADAPTER_MODES } from './provider-adapter';
 import {
   convertOpenAIChatToEval2Otel,
   convertOpenAICompatibleToEval2Otel,
@@ -79,7 +79,7 @@ export function convertProviderWithEvidence(payload: {
   const mode = explicitMode ?? detected;
   const warnings: ConversionWarning[] = [];
 
-  if (explicitMode && !isProviderKnown(explicitMode)) {
+  if (explicitMode && !isKnownProviderAdapterMode(explicitMode)) {
     warnings.push({
       code: 'provider.unsupported',
       message: `Unsupported provider mode: ${payload.provider}`,
@@ -106,13 +106,10 @@ export function convertProviderWithEvidence(payload: {
     });
   }
 
-  const evalResult = convertProviderToEvalResult(
-    request as any,
-    response as any,
-    startTime,
-    endTime,
-    mode,
-  );
+  const converted = isKnownProviderAdapterMode(mode)
+    ? createProviderAdapter(mode).convert({ request, response, startTime, endTime })
+    : undefined;
+  const evalResult = converted?.evalResult ?? null;
 
   if (!evalResult) {
     if (!warnings.some(w => w.code === 'provider.autodetect_failed')) {
@@ -136,10 +133,11 @@ export function convertProviderWithEvidence(payload: {
   }
 
   const evidence = {
+    ...converted?.evidence,
     ...evalResult.evidence,
-    rawPayloadSha256: evalResult.evidence?.rawPayloadSha256 ?? sha256({ request, response }),
-    warningCount: warnings.length,
-    warnings,
+    rawPayloadSha256: evalResult.evidence?.rawPayloadSha256 ?? converted?.evidence.rawPayloadSha256 ?? sha256({ request, response }),
+    warningCount: warnings.length + (converted?.warnings.length ?? 0),
+    warnings: [...warnings, ...(converted?.warnings ?? [])],
   };
 
   return {
@@ -151,12 +149,10 @@ export function convertProviderWithEvidence(payload: {
         ...evalResult.provenance,
         sourceFramework: evalResult.provenance?.sourceFramework ?? 'provider-native',
         adapter: evalResult.provenance?.adapter ?? mode,
-        adapterVersion: evalResult.provenance?.adapterVersion ?? EVAL2OTEL_CONTRACT_VERSION,
-        contractVersion: evalResult.provenance?.contractVersion ?? EVAL2OTEL_CONTRACT_VERSION,
       },
       evidence,
     },
-    warnings,
+    warnings: evidence.warnings ?? [],
     evidence,
   };
 }
@@ -179,9 +175,9 @@ export function convertAnyProvider(payload: {
 
 export function isProviderKnown(mode: string | undefined): boolean {
   if (!mode) return false;
-  return ['openai-chat','openai-compatible','anthropic','cohere','bedrock','vertex','ollama'].includes(mode as string);
+  return isKnownProviderAdapterMode(mode);
 }
 
 export function listSupportedProviders(): ProviderMode[] {
-  return ['openai-chat','openai-compatible','anthropic','cohere','bedrock','vertex','ollama'];
+  return [...PROVIDER_ADAPTER_MODES];
 }

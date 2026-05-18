@@ -1,6 +1,6 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { Resource } from '@opentelemetry/resources';
+import { defaultResource, resourceFromAttributes } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 
 import { Eval2OtelConverter } from './converter';
@@ -46,7 +46,7 @@ export class Eval2Otel {
       }
       return; // No SDK initialization
     }
-    const baseResource = Resource.default();
+    const baseResource = defaultResource();
 
     // Determine final service.name respecting environment precedence
     const envServiceName = process.env.OTEL_SERVICE_NAME
@@ -71,7 +71,7 @@ export class Eval2Otel {
     }
 
     // Merge with default resource to preserve host/runtime attrs
-    const resource = baseResource.merge(new Resource(resourceAttributes));
+    const resource = baseResource.merge(resourceFromAttributes(resourceAttributes));
 
     const sdkConfig = {
       resource,
@@ -228,6 +228,8 @@ export {
   EvalResult,
   GenAIAttributes,
   OtelConfig,
+  ProviderAdapter,
+  ProviderAdapterInput,
   ProcessOptions,
   ProviderConversionResult,
 } from './types';
@@ -242,7 +244,32 @@ export {
   normalizeProviderName,
   sha256,
 } from './contract';
+export {
+  ATTRIBUTE_REGISTRY,
+  assertRegisteredAttributes,
+  collectUnknownAttributes,
+  isRegisteredAttribute,
+  type AttributeSource,
+  type AttributeSpec,
+} from './semconv';
+export {
+  PROVIDER_ADAPTER_MODES,
+  createProviderAdapter,
+  isKnownProviderAdapterMode,
+  type KnownProviderAdapterMode,
+} from './provider-adapter';
+export {
+  deriveRagMetrics,
+  getRagMetricValue,
+  type RagDerivedMetrics,
+} from './rag';
 export { detectProvider, convertProviderToEvalResult, convertProviderWithEvidence, convertAnyProvider, type ProviderMode } from './helpers';
+export {
+  convertPromptfooResult,
+  convertPromptfooToEvalResults,
+  type PromptfooAdapterOptions,
+  type PromptfooConversionResult,
+} from './integrations';
 export { 
   Eval2OtelValidation, 
   ValidationResult, 
