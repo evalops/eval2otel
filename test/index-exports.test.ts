@@ -31,6 +31,10 @@ describe('Package exports', () => {
     expect(pkg.getRagMetricValue).toBeDefined();
     expect(pkg.convertPromptfooResult).toBeDefined();
     expect(pkg.convertPromptfooToEvalResults).toBeDefined();
+    expect(pkg.convertRagasResult).toBeDefined();
+    expect(pkg.convertRagasToEvalResults).toBeDefined();
+    expect(pkg.convertDeepEvalResult).toBeDefined();
+    expect(pkg.convertDeepEvalToEvalResults).toBeDefined();
     expect(pkg.convertOllamaToEval2Otel).toBeDefined();
     expect(pkg.convertOpenAICompatibleToEval2Otel).toBeDefined();
     expect(pkg.convertBedrockToEval2Otel).toBeDefined();

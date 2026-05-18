@@ -265,10 +265,18 @@ export {
 } from './rag';
 export { detectProvider, convertProviderToEvalResult, convertProviderWithEvidence, convertAnyProvider, type ProviderMode } from './helpers';
 export {
+  convertDeepEvalResult,
+  convertDeepEvalToEvalResults,
   convertPromptfooResult,
   convertPromptfooToEvalResults,
+  convertRagasResult,
+  convertRagasToEvalResults,
+  type DeepEvalAdapterOptions,
+  type DeepEvalConversionResult,
   type PromptfooAdapterOptions,
   type PromptfooConversionResult,
+  type RagasAdapterOptions,
+  type RagasConversionResult,
 } from './integrations';
 export { 
   Eval2OtelValidation, 
