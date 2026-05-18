@@ -1,5 +1,6 @@
-import { metrics, Histogram, Meter, context as otContext } from '@opentelemetry/api';
-import { EvalResult, OtelConfig, ProcessOptions } from './types';
+import { metrics, Counter, Histogram, Meter, context as otContext } from '@opentelemetry/api';
+import { normalizeProviderName } from './contract';
+import { ConversionReport, EvalResult, OtelConfig, ProcessOptions } from './types';
 
 export class Eval2OtelMetrics {
   private meter: Meter;
@@ -30,6 +31,14 @@ export class Eval2OtelMetrics {
   private validationSuccessRateHistogram!: Histogram;
   private validationRetryCountHistogram!: Histogram;
   private validationDurationHistogram!: Histogram;
+
+  // Eval2Otel operational telemetry
+  private conversionCountCounter!: Counter;
+  private conversionDurationHistogram!: Histogram;
+  private conversionWarningCountHistogram!: Histogram;
+  private conversionDroppedEventHistogram!: Histogram;
+  private conversionRedactedContentHistogram!: Histogram;
+  private conversionTruncatedContentHistogram!: Histogram;
 
   constructor(config: OtelConfig) {
     this.config = config;
@@ -118,6 +127,36 @@ export class Eval2OtelMetrics {
       description: 'Time taken for validation including retries',
       unit: 'ms',
     });
+
+    this.conversionCountCounter = this.meter.createCounter('eval2otel.conversion.count', {
+      description: 'Number of eval2otel conversion attempts by status',
+      unit: '{conversion}',
+    });
+
+    this.conversionDurationHistogram = this.meter.createHistogram('eval2otel.conversion.duration', {
+      description: 'Duration of eval2otel conversion work',
+      unit: 'ms',
+    });
+
+    this.conversionWarningCountHistogram = this.meter.createHistogram('eval2otel.conversion.warning_count', {
+      description: 'Number of warnings produced during conversion',
+      unit: '{warning}',
+    });
+
+    this.conversionDroppedEventHistogram = this.meter.createHistogram('eval2otel.conversion.dropped_event_count', {
+      description: 'Number of operational events dropped by conversion guardrails',
+      unit: '{event}',
+    });
+
+    this.conversionRedactedContentHistogram = this.meter.createHistogram('eval2otel.conversion.redacted_content_count', {
+      description: 'Number of message/tool content fields redacted during conversion',
+      unit: '{field}',
+    });
+
+    this.conversionTruncatedContentHistogram = this.meter.createHistogram('eval2otel.conversion.truncated_content_count', {
+      description: 'Number of message/tool content fields truncated during conversion',
+      unit: '{field}',
+    });
   }
 
   /**
@@ -132,7 +171,7 @@ export class Eval2OtelMetrics {
     };
 
     // Provider discriminator aligned with latest GenAI semconv
-    const provider = this.getProviderName(evalResult.system);
+    const provider = normalizeProviderName(evalResult.system);
     if (provider) {
       (baseAttributes as any)['gen_ai.provider.name'] = provider;
     }
@@ -276,15 +315,36 @@ export class Eval2OtelMetrics {
     }
   }
 
-  private getProviderName(system?: string): string | undefined {
-    if (!system) return undefined;
-    const s = system.toLowerCase();
-    if (s.includes('azure')) return 'azure.openai';
-    if (s.includes('bedrock') || s.includes('aws')) return 'aws.bedrock';
-    if (s.includes('vertex') || s.includes('gemini') || s.includes('google')) return 'google.vertex';
-    if (s.includes('anthropic') || s.includes('claude')) return 'anthropic';
-    if (s.includes('openai')) return 'openai';
-    return s;
+  recordConversionTelemetry(evalResult: Partial<EvalResult> | undefined, report: ConversionReport): void {
+    const attrs: Record<string, string | number> = {
+      'evalops.contract.version': report.contractVersion,
+      'evalops.semconv.version': report.semconvVersion,
+      'evalops.conversion.status': report.success ? 'success' : 'failure',
+      'evalops.eval.id': report.evalId,
+    };
+
+    if (evalResult?.operation) {
+      attrs['gen_ai.operation.name'] = evalResult.operation;
+    }
+    if (evalResult?.system) {
+      attrs['gen_ai.system'] = evalResult.system;
+      const provider = normalizeProviderName(evalResult.system);
+      if (provider) attrs['gen_ai.provider.name'] = provider;
+    }
+    if (evalResult?.request?.model) {
+      attrs['gen_ai.request.model'] = evalResult.request.model;
+    }
+    if (report.errorType) {
+      attrs['error.type'] = report.errorType;
+    }
+
+    const prepared = this.filterMetricAttributes(attrs);
+    this.conversionCountCounter.add(1, prepared);
+    this.conversionDurationHistogram.record(report.durationMs, prepared);
+    this.conversionWarningCountHistogram.record(report.warningCount, prepared);
+    this.conversionDroppedEventHistogram.record(report.droppedEventCount, prepared);
+    this.conversionRedactedContentHistogram.record(report.redactedContentCount, prepared);
+    this.conversionTruncatedContentHistogram.record(report.truncatedContentCount, prepared);
   }
 
   /**

@@ -1,6 +1,35 @@
 import { Span, SpanContext } from '@opentelemetry/api';
 import { z } from 'zod';
 
+export const ConversionWarningSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  severity: z.enum(['info', 'warning', 'error']).optional(),
+});
+
+export const Eval2OtelProvenanceSchema = z.object({
+  sourceFramework: z.string().optional(),
+  runId: z.string().optional(),
+  caseId: z.string().optional(),
+  datasetId: z.string().optional(),
+  datasetVersion: z.string().optional(),
+  adapter: z.string().optional(),
+  adapterVersion: z.string().optional(),
+  contractVersion: z.string().optional(),
+  semconvVersion: z.string().optional(),
+});
+
+export const Eval2OtelEvidenceSchema = z.object({
+  rawPayloadSha256: z.string().optional(),
+  promptSha256: z.string().optional(),
+  responseSha256: z.string().optional(),
+  redactedContentCount: z.number().nonnegative().optional(),
+  truncatedContentCount: z.number().nonnegative().optional(),
+  droppedEventCount: z.number().nonnegative().optional(),
+  warningCount: z.number().nonnegative().optional(),
+  warnings: z.array(ConversionWarningSchema).optional(),
+});
+
 // Zod schema for runtime validation
 export const EvalResultSchema = z.object({
   id: z.string(),
@@ -142,9 +171,41 @@ export const EvalResultSchema = z.object({
     name: z.string().optional(),
     attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])).optional(),
   }).optional(),
+
+  // Eval2Otel provenance/evidence metadata. These fields are emitted as
+  // namespaced attributes and are intended for auditability, not prompt content.
+  provenance: Eval2OtelProvenanceSchema.optional(),
+  evidence: Eval2OtelEvidenceSchema.optional(),
 });
 
 export type EvalResult = z.infer<typeof EvalResultSchema>;
+export type ConversionWarning = z.infer<typeof ConversionWarningSchema>;
+export type Eval2OtelProvenance = z.infer<typeof Eval2OtelProvenanceSchema>;
+export type Eval2OtelEvidence = z.infer<typeof Eval2OtelEvidenceSchema>;
+
+export interface ConversionReport {
+  evalId: string;
+  success: boolean;
+  contractVersion: string;
+  semconvVersion: string;
+  spanName?: string;
+  eventCount: number;
+  droppedEventCount: number;
+  redactedContentCount: number;
+  truncatedContentCount: number;
+  warningCount: number;
+  warnings: ConversionWarning[];
+  durationMs: number;
+  errorType?: string;
+}
+
+export interface ProviderConversionResult {
+  mode: string;
+  confidence: 'explicit' | 'detected' | 'unknown';
+  evalResult: EvalResult | null;
+  warnings: ConversionWarning[];
+  evidence: Eval2OtelEvidence;
+}
 
 export interface OtelConfig {
   /** Service name for OpenTelemetry */

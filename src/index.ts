@@ -5,6 +5,7 @@ import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
 
 import { Eval2OtelConverter } from './converter';
 import { Eval2OtelMetrics } from './metrics';
+import { buildFailureConversionReport } from './contract';
 import { EvalResult, OtelConfig, ProcessOptions } from './types';
 
 export class Eval2Otel {
@@ -150,13 +151,17 @@ export class Eval2Otel {
    * Process a single evaluation result with optional additional context
    */
   processEvaluation(evalResult: EvalResult, options?: ProcessOptions): void {
+    const startedAt = Date.now();
     try {
       // Convert to OpenTelemetry spans and events
-      this.converter.convertEvalResult(evalResult, options);
+      const report = this.converter.convertEvalResult(evalResult, options);
       
       // Record metrics
       this.metrics.recordMetrics(evalResult, options);
+      this.metrics.recordConversionTelemetry(evalResult, report);
     } catch (error) {
+      const report = buildFailureConversionReport(evalResult, this.config, error, Date.now() - startedAt);
+      this.metrics.recordConversionTelemetry(evalResult, report);
       console.error('Error processing evaluation:', error);
       throw error; // Re-throw for proper error handling
     }
@@ -215,10 +220,29 @@ export class Eval2Otel {
 }
 
 // Re-export types and classes
-export { EvalResult, OtelConfig, GenAIAttributes, ProcessOptions } from './types';
+export {
+  ConversionReport,
+  ConversionWarning,
+  Eval2OtelEvidence,
+  Eval2OtelProvenance,
+  EvalResult,
+  GenAIAttributes,
+  OtelConfig,
+  ProcessOptions,
+  ProviderConversionResult,
+} from './types';
 export { Eval2OtelConverter } from './converter';
 export { Eval2OtelMetrics } from './metrics';
-export { detectProvider, convertProviderToEvalResult, convertAnyProvider, type ProviderMode } from './helpers';
+export {
+  EVAL2OTEL_CONTRACT_VERSION,
+  UNKNOWN_SEMCONV_VERSION,
+  buildConversionReport,
+  buildEval2OtelAttributes,
+  buildEval2OtelEvidence,
+  normalizeProviderName,
+  sha256,
+} from './contract';
+export { detectProvider, convertProviderToEvalResult, convertProviderWithEvidence, convertAnyProvider, type ProviderMode } from './helpers';
 export { 
   Eval2OtelValidation, 
   ValidationResult, 

@@ -1,0 +1,94 @@
+{
+  "name": "tool execution provenance and argument truncation",
+  "config": {
+    "captureContent": true,
+    "contentMaxLength": 18,
+    "markTruncatedContent": true
+  },
+  "evalResult": {
+    "id": "contract-tool-1",
+    "timestamp": 1700000002000,
+    "model": "claude-3-5-sonnet",
+    "system": "anthropic",
+    "operation": "execute_tool",
+    "request": {
+      "model": "claude-3-5-sonnet"
+    },
+    "response": {
+      "choices": [{
+        "index": 0,
+        "finishReason": "tool_calls",
+        "message": {
+          "role": "assistant",
+          "toolCalls": [{
+            "id": "tool-call-1",
+            "type": "function",
+            "function": {
+              "name": "lookup_policy",
+              "arguments": {
+                "customer": "evalops",
+                "query": "show me the full retention policy"
+              }
+            }
+          }]
+        }
+      }]
+    },
+    "usage": {
+      "inputTokens": 18,
+      "outputTokens": 4
+    },
+    "performance": {
+      "duration": 0.42
+    },
+    "tool": {
+      "name": "lookup_policy",
+      "callId": "tool-call-1"
+    },
+    "provenance": {
+      "sourceFramework": "deepeval",
+      "runId": "run-tool-1",
+      "caseId": "case-tool",
+      "adapter": "anthropic",
+      "adapterVersion": "eval2otel.v1",
+      "contractVersion": "eval2otel.v1"
+    },
+    "evidence": {
+      "rawPayloadSha256": "raw-payload-hash-from-adapter",
+      "promptSha256": "prompt-hash-from-adapter",
+      "responseSha256": "response-hash-from-adapter"
+    }
+  },
+  "expected": {
+    "spanName": "gen_ai.execute_tool",
+    "startAttributes": {
+      "evalops.source.framework": "deepeval",
+      "evalops.adapter.name": "anthropic",
+      "evalops.adapter.version": "eval2otel.v1",
+      "evalops.raw_payload_sha256": "raw-payload-hash-from-adapter",
+      "evalops.prompt_sha256": "prompt-hash-from-adapter",
+      "evalops.response_sha256": "response-hash-from-adapter",
+      "gen_ai.provider.name": "anthropic",
+      "gen_ai.tool.name": "lookup_policy",
+      "gen_ai.tool.call.id": "tool-call-1"
+    },
+    "finalAttributes": {
+      "evalops.dropped_event_count": 0,
+      "evalops.redacted_content_count": 0,
+      "evalops.truncated_content_count": 1
+    },
+    "events": [{
+      "name": "gen_ai.tool.message",
+      "attributes": {
+        "gen_ai.tool.name": "lookup_policy",
+        "gen_ai.tool.call.id": "tool-call-1",
+        "gen_ai.tool.arguments": "{\"customer\":\"evalo"
+      }
+    }, {
+      "name": "gen_ai.assistant.message",
+      "attributes": {
+        "gen_ai.response.finish_reason": "tool_calls"
+      }
+    }]
+  }
+}

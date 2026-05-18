@@ -4,7 +4,7 @@
  * Usage: npx eval2otel-cli ingest --file ./evals.jsonl [--provider <mode>]
  */
 import { createEval2Otel, EvalResult, OtelConfig } from './index';
-import { detectProvider, convertProviderToEvalResult } from './helpers';
+import { convertProviderWithEvidence, detectProvider } from './helpers';
 import * as fs from 'fs';
 import * as readline from 'readline';
 
@@ -73,7 +73,14 @@ export async function runCli(argv: string[]) {
         if (providerMode && !['openai-chat','openai-compatible','anthropic','cohere','bedrock','vertex','ollama'].includes(mode)) {
           throw new Error(`Unknown --provider value: ${providerMode}`);
         }
-        evalResult = convertProviderToEvalResult(request, response, start, end, mode as any);
+        const conversion = convertProviderWithEvidence({
+          request,
+          response,
+          startTime: start,
+          endTime: end,
+          provider: mode as any,
+        });
+        evalResult = conversion.evalResult;
         if (!evalResult) {
           if (!providerMode && detected === 'unknown' && noFallback) {
             throw new Error('Autodetect failed and fallback disabled');

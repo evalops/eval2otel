@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added
+- Versioned `eval2otel.v1` telemetry contract documentation and fixture-backed conformance tests.
+- Optional `EvalResult.provenance` and `EvalResult.evidence` metadata for audit joins, payload hashes, adapter identity, run/case/dataset identity, and conversion warnings.
+- Eval2Otel self-telemetry for conversion attempts, duration, warning count, dropped events, redacted content, and truncated content.
+- Provider conversion helper that returns structured evidence and warnings alongside the converted `EvalResult`.
+
+### Changed
+- Emit Eval2Otel contract/evidence attributes on spans, including redaction, truncation, warning, and dropped-event counters.
+- Harden npm publishing with package smoke validation and provenance publishing.
+
 ## [0.3.0] - 2025-08-08
 
 ### Added

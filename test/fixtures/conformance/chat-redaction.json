@@ -1,0 +1,99 @@
+{
+  "name": "chat redaction and provenance",
+  "config": {
+    "captureContent": true,
+    "semconvGaVersion": "1.37.0"
+  },
+  "redactPattern": "SECRET-[0-9]+",
+  "evalResult": {
+    "id": "contract-chat-1",
+    "timestamp": 1700000000000,
+    "model": "gpt-4o-mini",
+    "system": "openai",
+    "operation": "chat",
+    "request": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.2,
+      "maxTokens": 128
+    },
+    "response": {
+      "id": "resp-contract-chat-1",
+      "model": "gpt-4o-mini",
+      "finishReasons": ["stop"],
+      "choices": [{
+        "index": 0,
+        "finishReason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "Final answer includes SECRET-456."
+        }
+      }]
+    },
+    "usage": {
+      "inputTokens": 12,
+      "outputTokens": 8,
+      "totalTokens": 20
+    },
+    "performance": {
+      "duration": 1.25
+    },
+    "conversation": {
+      "id": "conv-contract-1",
+      "messages": [{
+        "role": "user",
+        "content": "Please answer without leaking SECRET-123."
+      }]
+    },
+    "provenance": {
+      "sourceFramework": "promptfoo",
+      "runId": "run-2026-05-18",
+      "caseId": "case-redaction",
+      "datasetId": "evalops-core",
+      "datasetVersion": "2026.05"
+    },
+    "evidence": {
+      "warnings": [{
+        "code": "fixture.notice",
+        "message": "Fixture carries one warning so warning_count is contract-tested.",
+        "severity": "info"
+      }]
+    }
+  },
+  "expected": {
+    "spanName": "gen_ai.chat",
+    "startAttributes": {
+      "evalops.contract.version": "eval2otel.v1",
+      "evalops.semconv.version": "1.37.0",
+      "evalops.eval.id": "contract-chat-1",
+      "evalops.source.framework": "promptfoo",
+      "evalops.run.id": "run-2026-05-18",
+      "evalops.case.id": "case-redaction",
+      "evalops.dataset.id": "evalops-core",
+      "evalops.dataset.version": "2026.05",
+      "evalops.warning_count": 1,
+      "gen_ai.provider.name": "openai",
+      "gen_ai.operation.name": "chat",
+      "gen_ai.request.model": "gpt-4o-mini"
+    },
+    "finalAttributes": {
+      "evalops.redacted_content_count": 2,
+      "evalops.truncated_content_count": 0,
+      "evalops.dropped_event_count": 0
+    },
+    "events": [{
+      "name": "gen_ai.user.message",
+      "attributes": {
+        "gen_ai.message.content": "Please answer without leaking [REDACTED].",
+        "gen_ai.message.content_type": "text"
+      },
+      "forbiddenContent": "SECRET-123"
+    }, {
+      "name": "gen_ai.assistant.message",
+      "attributes": {
+        "gen_ai.message.content": "Final answer includes [REDACTED].",
+        "gen_ai.response.finish_reason": "stop"
+      },
+      "forbiddenContent": "SECRET-456"
+    }]
+  }
+}

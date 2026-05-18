@@ -1,0 +1,93 @@
+{
+  "name": "event cap records dropped RAG metadata",
+  "config": {
+    "captureContent": true,
+    "maxEventsPerSpan": 2
+  },
+  "evalResult": {
+    "id": "contract-rag-cap-1",
+    "timestamp": 1700000001000,
+    "model": "gpt-4o-mini",
+    "system": "azure-openai",
+    "operation": "chat",
+    "request": {
+      "model": "gpt-4o-mini"
+    },
+    "response": {
+      "choices": [{
+        "index": 0,
+        "finishReason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "grounded answer"
+        }
+      }]
+    },
+    "usage": {
+      "inputTokens": 44,
+      "outputTokens": 12
+    },
+    "performance": {
+      "duration": 0.75
+    },
+    "conversation": {
+      "id": "conv-rag-cap",
+      "messages": [{
+        "role": "system",
+        "content": "answer with citations"
+      }, {
+        "role": "user",
+        "content": "what did the release say?"
+      }]
+    },
+    "rag": {
+      "retrievalMethod": "hybrid",
+      "documentsRetrieved": 3,
+      "documentsUsed": 2,
+      "chunks": [{
+        "id": "chunk-a",
+        "source": "release-notes.md",
+        "relevanceScore": 0.92,
+        "position": 0
+      }, {
+        "id": "chunk-b",
+        "source": "contract.md",
+        "relevanceScore": 0.86,
+        "position": 1
+      }],
+      "metrics": {
+        "contextPrecision": 0.8,
+        "contextRecall": 0.7,
+        "answerRelevance": 0.9,
+        "faithfulness": 0.95
+      }
+    }
+  },
+  "expected": {
+    "spanName": "gen_ai.chat",
+    "startAttributes": {
+      "gen_ai.provider.name": "azure.openai",
+      "gen_ai.rag.retrieval_method": "hybrid",
+      "gen_ai.rag.documents_retrieved": 3,
+      "gen_ai.rag.context_precision": 0.8
+    },
+    "finalAttributes": {
+      "evalops.dropped_event_count": 3,
+      "evalops.redacted_content_count": 0,
+      "evalops.truncated_content_count": 0
+    },
+    "events": [{
+      "name": "gen_ai.system.message",
+      "attributes": {
+        "gen_ai.message.index": 0,
+        "gen_ai.message.content": "answer with citations"
+      }
+    }, {
+      "name": "gen_ai.user.message",
+      "attributes": {
+        "gen_ai.message.index": 1,
+        "gen_ai.message.content": "what did the release say?"
+      }
+    }]
+  }
+}
