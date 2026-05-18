@@ -40,6 +40,7 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 14
           name: coverage-${{ matrix.node-version }}
           path: |
             coverage/lcov.info
