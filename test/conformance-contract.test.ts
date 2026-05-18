@@ -18,6 +18,8 @@ class CapturingSpan implements Span {
   setStatus() { return this; }
   setAttribute(key: string, value: unknown) { this.attributes[key] = value; return this; }
   setAttributes(attrs: Record<string, unknown>) { Object.assign(this.attributes, attrs); return this; }
+  addLink() { return this; }
+  addLinks() { return this; }
   recordException() { return this; }
   end() {}
   spanContext(): any { return {}; }
@@ -39,6 +41,7 @@ interface ConformanceFixture {
   name: string;
   config?: Partial<OtelConfig>;
   redactPattern?: string;
+  redactMode?: 'replace' | 'null';
   evalResult: EvalResult;
   expected: {
     spanName: string;
@@ -47,6 +50,7 @@ interface ConformanceFixture {
     events: Array<{
       name: string;
       attributes?: Record<string, unknown>;
+      absentAttributes?: string[];
       forbiddenContent?: string;
     }>;
   };
@@ -74,7 +78,11 @@ describe('eval2otel conformance contract', () => {
       useSdk: false,
       ...fixture.config,
       redact: fixture.redactPattern
-        ? (content: string) => content.replace(new RegExp(fixture.redactPattern!, 'g'), '[REDACTED]')
+        ? (content: string) => {
+          const pattern = new RegExp(fixture.redactPattern!, 'g');
+          if (!pattern.test(content)) return content;
+          return fixture.redactMode === 'null' ? null : content.replace(pattern, '[REDACTED]');
+        }
         : undefined,
     };
 
@@ -93,6 +101,9 @@ describe('eval2otel conformance contract', () => {
     fixture.expected.events.forEach((expectedEvent, index) => {
       const actual = started.span.events[index];
       expect(actual.attributes).toEqual(expect.objectContaining(expectedEvent.attributes ?? {}));
+      (expectedEvent.absentAttributes ?? []).forEach(key => {
+        expect(actual.attributes).not.toHaveProperty(key);
+      });
       if (expectedEvent.forbiddenContent) {
         expect(JSON.stringify(actual.attributes)).not.toContain(expectedEvent.forbiddenContent);
       }

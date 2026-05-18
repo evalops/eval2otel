@@ -1,5 +1,6 @@
 import { metrics, Counter, Histogram, Meter, context as otContext } from '@opentelemetry/api';
 import { normalizeProviderName } from './contract';
+import { getRagMetricValue } from './rag';
 import { ConversionReport, EvalResult, OtelConfig, ProcessOptions } from './types';
 
 export class Eval2OtelMetrics {
@@ -22,6 +23,13 @@ export class Eval2OtelMetrics {
   private ragAnswerRelevanceHistogram!: Histogram;
   private ragFaithfulnessHistogram!: Histogram;
   private ragDocumentsRetrievedHistogram!: Histogram;
+  private ragMeanReciprocalRankHistogram!: Histogram;
+  private ragNdcgHistogram!: Histogram;
+  private ragCitationCoverageHistogram!: Histogram;
+  private ragRetrievalUsedRatioHistogram!: Histogram;
+  private ragTopKRelevanceMeanHistogram!: Histogram;
+  private ragTopKRelevanceMinHistogram!: Histogram;
+  private ragContextTokensUsedHistogram!: Histogram;
   
   // Agent metrics
   private agentStepDurationHistogram!: Histogram;
@@ -99,6 +107,41 @@ export class Eval2OtelMetrics {
     this.ragDocumentsRetrievedHistogram = this.meter.createHistogram('gen_ai.rag.documents_retrieved', {
       description: 'Number of documents retrieved in RAG operations',
       unit: '{document}',
+    });
+
+    this.ragMeanReciprocalRankHistogram = this.meter.createHistogram('gen_ai.rag.mean_reciprocal_rank', {
+      description: 'Measures ranking quality by reciprocal rank of the first used context chunk',
+      unit: '1',
+    });
+
+    this.ragNdcgHistogram = this.meter.createHistogram('gen_ai.rag.ndcg', {
+      description: 'Measures normalized discounted cumulative gain for retrieved context ordering',
+      unit: '1',
+    });
+
+    this.ragCitationCoverageHistogram = this.meter.createHistogram('gen_ai.rag.citation_coverage', {
+      description: 'Share of used retrieved chunks that have citation identifiers',
+      unit: '1',
+    });
+
+    this.ragRetrievalUsedRatioHistogram = this.meter.createHistogram('gen_ai.rag.retrieval_used_ratio', {
+      description: 'Ratio of retrieved documents used by the generation step',
+      unit: '1',
+    });
+
+    this.ragTopKRelevanceMeanHistogram = this.meter.createHistogram('gen_ai.rag.top_k_relevance_mean', {
+      description: 'Mean relevance score across retrieved top-k chunks',
+      unit: '1',
+    });
+
+    this.ragTopKRelevanceMinHistogram = this.meter.createHistogram('gen_ai.rag.top_k_relevance_min', {
+      description: 'Minimum relevance score across retrieved top-k chunks',
+      unit: '1',
+    });
+
+    this.ragContextTokensUsedHistogram = this.meter.createHistogram('gen_ai.rag.context_tokens_used', {
+      description: 'Number of retrieved context tokens used in generation',
+      unit: '{token}',
     });
     
     // Agent metrics
@@ -282,6 +325,13 @@ export class Eval2OtelMetrics {
           );
         }
       }
+      this.recordOptionalRagMetric(this.ragMeanReciprocalRankHistogram, getRagMetricValue(evalResult.rag, 'meanReciprocalRank'), attributes, ctx);
+      this.recordOptionalRagMetric(this.ragNdcgHistogram, getRagMetricValue(evalResult.rag, 'ndcg'), attributes, ctx);
+      this.recordOptionalRagMetric(this.ragCitationCoverageHistogram, getRagMetricValue(evalResult.rag, 'citationCoverage'), attributes, ctx);
+      this.recordOptionalRagMetric(this.ragRetrievalUsedRatioHistogram, getRagMetricValue(evalResult.rag, 'retrievalUsedRatio'), attributes, ctx);
+      this.recordOptionalRagMetric(this.ragTopKRelevanceMeanHistogram, getRagMetricValue(evalResult.rag, 'topKRelevanceMean'), attributes, ctx);
+      this.recordOptionalRagMetric(this.ragTopKRelevanceMinHistogram, getRagMetricValue(evalResult.rag, 'topKRelevanceMin'), attributes, ctx);
+      this.recordOptionalRagMetric(this.ragContextTokensUsedHistogram, getRagMetricValue(evalResult.rag, 'contextTokensUsed'), attributes, ctx);
     }
     
     // Record agent metrics if present
@@ -312,6 +362,17 @@ export class Eval2OtelMetrics {
     // Record additional custom metrics if provided in options
     if (options?.metrics) {
       this.recordCustomMetrics(options.metrics, attributes);
+    }
+  }
+
+  private recordOptionalRagMetric(
+    histogram: Histogram,
+    value: number | undefined,
+    attributes: Record<string, string | number>,
+    ctx: unknown,
+  ): void {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      histogram.record(value, this.filterMetricAttributes(attributes), ctx as any);
     }
   }
 

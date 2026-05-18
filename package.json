@@ -30,6 +30,10 @@
   "bugs": "https://github.com/evalops/eval2otel/issues",
   "files": [
     "dist/",
+    "docs/",
+    "examples/",
+    "dashboards/",
+    "python/",
     "README.md",
     "LICENSE",
     "package.json"
@@ -49,10 +53,10 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.7.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.40.0",
-    "@opentelemetry/sdk-node": "^0.45.0",
-    "@opentelemetry/semantic-conventions": "^1.18.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.76.0",
+    "@opentelemetry/sdk-node": "^0.218.0",
+    "@opentelemetry/semantic-conventions": "^1.41.1",
     "zod": "^4.0.15"
   }
 }

@@ -4,11 +4,11 @@ WORKDIR /app
 
 # Create basic package.json and install test dependencies + eval2otel dependencies
 RUN npm init -y && \
-    npm install axios \
-        @opentelemetry/api@^1.7.0 \
-        @opentelemetry/auto-instrumentations-node@^0.40.0 \
-        @opentelemetry/sdk-node@^0.45.0 \
-        @opentelemetry/semantic-conventions@^1.18.0 \
+    npm install axios@^1.16.1 \
+        @opentelemetry/api@^1.9.1 \
+        @opentelemetry/auto-instrumentations-node@^0.76.0 \
+        @opentelemetry/sdk-node@^0.218.0 \
+        @opentelemetry/semantic-conventions@^1.41.1 \
         zod@^4.0.15
 
 # Create proper eval2otel module directory structure  

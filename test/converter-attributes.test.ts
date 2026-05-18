@@ -93,6 +93,16 @@ describe('Converter span attributes and sampling branches', () => {
         retrievalMethod: 'hybrid',
         documentsRetrieved: 3,
         documentsUsed: 2,
+        dataSourceId: 'kb-prod',
+        query: 'what shipped?',
+        contextWindowTokens: 8192,
+        contextTruncated: true,
+        chunkSize: 512,
+        overlapSize: 64,
+        chunks: [
+          { id: 'chunk-a', source: 'a.md', relevanceScore: 0.7, position: 0, tokens: 20 },
+          { id: 'chunk-b', source: 'b.md', relevanceScore: 0.9, position: 1, tokens: 30, used: true, citationId: 'cite-1' },
+        ],
         metrics: { contextPrecision: 0.8, contextRecall: 0.9, answerRelevance: 0.95, faithfulness: 0.85 },
       },
     } as any;
@@ -110,6 +120,16 @@ describe('Converter span attributes and sampling branches', () => {
     expect(attrs['gen_ai.workflow.id']).toBe('w1');
     expect(attrs['gen_ai.rag.retrieval_method']).toBe('hybrid');
     expect(attrs['gen_ai.rag.context_precision']).toBe(0.8);
+    expect(attrs['gen_ai.data_source.id']).toBe('kb-prod');
+    expect(attrs['gen_ai.rag.query_sha256']).toMatch(/^[a-f0-9]{64}$/);
+    expect(attrs['gen_ai.rag.context_window_tokens']).toBe(8192);
+    expect(attrs['gen_ai.rag.context_tokens_used']).toBe(30);
+    expect(attrs['gen_ai.rag.context_truncated']).toBe(true);
+    expect(attrs['gen_ai.rag.chunk_size']).toBe(512);
+    expect(attrs['gen_ai.rag.overlap_size']).toBe(64);
+    expect(attrs['gen_ai.rag.mean_reciprocal_rank']).toBe(0.5);
+    expect(attrs['gen_ai.rag.retrieval_used_ratio']).toBeCloseTo(2 / 3);
+    expect(attrs['gen_ai.rag.citation_coverage']).toBe(1);
     expect(attrs['custom.attr']).toBe('yes');
   });
 });

@@ -1,0 +1,78 @@
+{
+  "name": "adversarial oversized payload is capped without dropping metadata",
+  "config": {
+    "captureContent": true,
+    "contentMaxLength": 16,
+    "markTruncatedContent": true,
+    "maxEventsPerSpan": 10
+  },
+  "evalResult": {
+    "id": "adversarial-payload-cap-1",
+    "timestamp": 1700000004000,
+    "model": "gpt-4o-mini",
+    "system": "openai",
+    "operation": "chat",
+    "request": {
+      "model": "gpt-4o-mini"
+    },
+    "response": {
+      "choices": [{
+        "index": 0,
+        "finishReason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "short reply"
+        }
+      }]
+    },
+    "usage": {
+      "inputTokens": 512,
+      "outputTokens": 3
+    },
+    "performance": {
+      "duration": 0.5
+    },
+    "conversation": {
+      "id": "conv-adversarial-payload",
+      "messages": [{
+        "role": "user",
+        "content": "0123456789abcdefghijklmnopqrstuvwxyz"
+      }]
+    },
+    "evidence": {
+      "warnings": [{
+        "code": "adversarial.payload_capped",
+        "message": "Oversized content was capped before emission.",
+        "severity": "info"
+      }]
+    }
+  },
+  "expected": {
+    "spanName": "gen_ai.chat",
+    "startAttributes": {
+      "evalops.warning_count": 1,
+      "gen_ai.provider.name": "openai",
+      "gen_ai.usage.input_tokens": 512
+    },
+    "finalAttributes": {
+      "evalops.redacted_content_count": 0,
+      "evalops.truncated_content_count": 1,
+      "evalops.dropped_event_count": 0
+    },
+    "events": [{
+      "name": "gen_ai.user.message",
+      "attributes": {
+        "gen_ai.message.content": "0123456789abcdef",
+        "gen_ai.message.content_truncated": true,
+        "gen_ai.message.content_type": "text"
+      },
+      "forbiddenContent": "ghijklmnopqrstuvwxyz"
+    }, {
+      "name": "gen_ai.assistant.message",
+      "attributes": {
+        "gen_ai.message.content": "short reply",
+        "gen_ai.response.finish_reason": "stop"
+      }
+    }]
+  }
+}

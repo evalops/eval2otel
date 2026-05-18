@@ -20,6 +20,24 @@ export const ATTR = {
   // Provider
   PROVIDER_NAME: 'gen_ai.provider.name',
 
+  // RAG / data source
+  DATA_SOURCE_ID: 'gen_ai.data_source.id',
+  RAG_QUERY_SHA256: 'gen_ai.rag.query_sha256',
+  RAG_CONTEXT_WINDOW_TOKENS: 'gen_ai.rag.context_window_tokens',
+  RAG_CONTEXT_TOKENS_USED: 'gen_ai.rag.context_tokens_used',
+  RAG_CONTEXT_TRUNCATED: 'gen_ai.rag.context_truncated',
+  RAG_CHUNK_SIZE: 'gen_ai.rag.chunk_size',
+  RAG_OVERLAP_SIZE: 'gen_ai.rag.overlap_size',
+  RAG_MRR: 'gen_ai.rag.mean_reciprocal_rank',
+  RAG_NDCG: 'gen_ai.rag.ndcg',
+  RAG_CITATION_COVERAGE: 'gen_ai.rag.citation_coverage',
+  RAG_RETRIEVAL_USED_RATIO: 'gen_ai.rag.retrieval_used_ratio',
+  RAG_TOP_K_RELEVANCE_MEAN: 'gen_ai.rag.top_k_relevance_mean',
+  RAG_TOP_K_RELEVANCE_MIN: 'gen_ai.rag.top_k_relevance_min',
+  RAG_CHUNK_USED: 'gen_ai.rag.chunk.used',
+  RAG_CHUNK_CITATION_ID: 'gen_ai.rag.chunk.citation_id',
+  RAG_CHUNK_EVIDENCE_SHA256: 'gen_ai.rag.chunk.evidence_sha256',
+
   // Eval2Otel contract/evidence attributes
   CONTRACT_VERSION: 'evalops.contract.version',
   SEMCONV_VERSION: 'evalops.semconv.version',

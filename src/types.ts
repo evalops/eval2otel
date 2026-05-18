@@ -151,18 +151,34 @@ export const EvalResultSchema = z.object({
     retrievalMethod: z.enum(['vector_search', 'keyword', 'hybrid']).optional(),
     documentsRetrieved: z.number().optional(),
     documentsUsed: z.number().optional(),
+    dataSourceId: z.string().optional(),
+    query: z.string().optional(),
+    contextWindowTokens: z.number().nonnegative().optional(),
+    contextTokensUsed: z.number().nonnegative().optional(),
+    contextTruncated: z.boolean().optional(),
+    chunkSize: z.number().nonnegative().optional(),
+    overlapSize: z.number().nonnegative().optional(),
     chunks: z.array(z.object({
       id: z.string(),
       source: z.string(),
       relevanceScore: z.number(),
       position: z.number(),
       tokens: z.number().optional(),
+      used: z.boolean().optional(),
+      citationId: z.string().optional(),
+      evidenceSha256: z.string().optional(),
     })).optional(),
     metrics: z.object({
       contextPrecision: z.number().optional(),
       contextRecall: z.number().optional(),
       answerRelevance: z.number().optional(),
       faithfulness: z.number().optional(),
+      meanReciprocalRank: z.number().optional(),
+      ndcg: z.number().optional(),
+      citationCoverage: z.number().optional(),
+      retrievalUsedRatio: z.number().optional(),
+      topKRelevanceMean: z.number().optional(),
+      topKRelevanceMin: z.number().optional(),
     }).optional(),
   }).optional(),
   
@@ -205,6 +221,18 @@ export interface ProviderConversionResult {
   evalResult: EvalResult | null;
   warnings: ConversionWarning[];
   evidence: Eval2OtelEvidence;
+}
+
+export interface ProviderAdapterInput {
+  request: unknown;
+  response: unknown;
+  startTime: number;
+  endTime?: number;
+}
+
+export interface ProviderAdapter {
+  mode: string;
+  convert(input: ProviderAdapterInput): ProviderConversionResult;
 }
 
 export interface OtelConfig {
