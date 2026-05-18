@@ -1,12 +1,20 @@
 import { SpanKind, SpanStatusCode, trace, Span, context } from '@opentelemetry/api';
 import { createHash } from 'crypto';
-import { EvalResult, GenAIAttributes, OtelConfig, ProcessOptions, EvalResultSchema } from './types';
+import { ConversionReport, EvalResult, GenAIAttributes, OtelConfig, ProcessOptions, EvalResultSchema } from './types';
 import { ATTR } from './attributes';
+import {
+  buildConversionReport,
+  buildEval2OtelAttributes,
+  normalizeProviderName,
+} from './contract';
 
 export class Eval2OtelConverter {
   private tracer;
   private config: OtelConfig;
   private eventCounts: WeakMap<Span, number> = new WeakMap();
+  private droppedEventCounts: WeakMap<Span, number> = new WeakMap();
+  private redactedContentCounts: WeakMap<Span, number> = new WeakMap();
+  private truncatedContentCounts: WeakMap<Span, number> = new WeakMap();
 
   constructor(config: OtelConfig) {
     this.config = config;
@@ -16,7 +24,8 @@ export class Eval2OtelConverter {
   /**
    * Convert an evaluation result to OpenTelemetry span and events
    */
-  convertEvalResult(evalResult: EvalResult, options?: ProcessOptions): void {
+  convertEvalResult(evalResult: EvalResult, options?: ProcessOptions): ConversionReport {
+    const conversionStartedAt = Date.now();
     // Validate input
     const validated = EvalResultSchema.parse(evalResult);
     
@@ -89,7 +98,17 @@ export class Eval2OtelConverter {
       this.addRAGChunkEvents(span, validated);
     }
 
+    const counters = {
+      eventCount: this.eventCounts.get(span) ?? 0,
+      droppedEventCount: this.droppedEventCounts.get(span) ?? 0,
+      redactedContentCount: this.redactedContentCounts.get(span) ?? 0,
+      truncatedContentCount: this.truncatedContentCounts.get(span) ?? 0,
+      durationMs: Date.now() - conversionStartedAt,
+    };
+    this.setSpanAttributes(span, buildEval2OtelAttributes(validated, this.config, counters));
+    const report = buildConversionReport(validated, this.config, spanName, counters);
     span.end(endTime);
+    return report;
   }
 
   /**
@@ -160,9 +179,10 @@ export class Eval2OtelConverter {
   /**
    * Truncate content if a max length is configured
    */
-  private truncateContent(content: string): string {
+  private truncateContent(content: string, span?: Span): string {
     const max = this.config.contentMaxLength;
     if (typeof max === 'number' && max > 0 && content.length > max) {
+      if (span) this.trackTruncation(span, true);
       return content.slice(0, max);
     }
     return content;
@@ -173,12 +193,48 @@ export class Eval2OtelConverter {
   }
 
   private canAddEvent(span: Span): boolean {
-    const cap = this.config.maxEventsPerSpan;
-    if (!cap || cap <= 0) return true;
     const current = this.eventCounts.get(span) ?? 0;
-    if (current >= cap) return false;
+    const cap = this.config.maxEventsPerSpan;
+    if (!cap || cap <= 0) {
+      this.eventCounts.set(span, current + 1);
+      return true;
+    }
+    if (current >= cap) {
+      this.incrementWeakCounter(this.droppedEventCounts, span);
+      return false;
+    }
     this.eventCounts.set(span, current + 1);
     return true;
+  }
+
+  private trackRedaction(span: Span, original: string, redacted: string | null): string | null {
+    if (redacted === null || redacted !== original) {
+      this.incrementWeakCounter(this.redactedContentCounts, span);
+    }
+    return redacted;
+  }
+
+  private trackTruncation(span: Span, truncated: boolean): void {
+    if (truncated) {
+      this.incrementWeakCounter(this.truncatedContentCounts, span);
+    }
+  }
+
+  private incrementWeakCounter(map: WeakMap<Span, number>, span: Span): void {
+    map.set(span, (map.get(span) ?? 0) + 1);
+  }
+
+  private setSpanAttributes(span: Span, attrs: Record<string, string | number | boolean | string[]>): void {
+    if (typeof (span as unknown as { setAttributes?: unknown }).setAttributes === 'function') {
+      (span as unknown as { setAttributes: (attributes: Record<string, string | number | boolean | string[]>) => void })
+        .setAttributes(attrs);
+      return;
+    }
+    Object.entries(attrs).forEach(([key, value]) => {
+      if (typeof span.setAttribute === 'function') {
+        span.setAttribute(key, value);
+      }
+    });
   }
 
   /**
@@ -191,10 +247,11 @@ export class Eval2OtelConverter {
     const attributes: GenAIAttributes = {
       'gen_ai.operation.name': evalResult.operation,
       'gen_ai.system': evalResult.system ?? 'unknown',
+      ...buildEval2OtelAttributes(evalResult, this.config),
     };
 
     // Provider discriminator aligned with latest GenAI semconv
-    const provider = this.getProviderName(evalResult.system);
+    const provider = normalizeProviderName(evalResult.system);
     if (provider) {
       (attributes as any)[ATTR.PROVIDER_NAME] = provider;
     }
@@ -352,21 +409,6 @@ export class Eval2OtelConverter {
   }
 
   /**
-   * Normalize provider names for gen_ai.provider.name
-   */
-  private getProviderName(system?: string): string | undefined {
-    if (!system) return undefined;
-    const s = system.toLowerCase();
-    if (s.includes('azure')) return 'azure.openai';
-    if (s.includes('bedrock') || s.includes('aws')) return 'aws.bedrock';
-    if (s.includes('vertex') || s.includes('gemini') || s.includes('google')) return 'google.vertex';
-    if (s.includes('anthropic') || s.includes('claude')) return 'anthropic';
-    if (s.includes('openai')) return 'openai';
-    // Keep explicit systems such as "ollama" or custom identifiers
-    return s;
-  }
-
-  /**
    * Add conversation message events to span
    */
   private addConversationEvents(span: Span, evalResult: EvalResult): void {
@@ -376,7 +418,7 @@ export class Eval2OtelConverter {
       const eventName = `gen_ai.${message.role}.message`;
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
-        [ATTR.PROVIDER_NAME]: this.getProviderName(evalResult.system) ?? 'unknown',
+        [ATTR.PROVIDER_NAME]: normalizeProviderName(evalResult.system) ?? 'unknown',
         [ATTR.MESSAGE_ROLE]: message.role,
         [ATTR.MESSAGE_INDEX]: index,
       };
@@ -384,7 +426,7 @@ export class Eval2OtelConverter {
       if (message.content !== undefined) {
         if (typeof message.content === 'string') {
           const original = message.content;
-          const redacted = this.redactMessageContent(original, message.role);
+          const redacted = this.trackRedaction(span, original, this.redactMessageContent(original, message.role));
           if (redacted !== null) {
             const max = this.config.contentMaxLength;
             let val = redacted;
@@ -393,6 +435,7 @@ export class Eval2OtelConverter {
               val = redacted.slice(0, max);
               truncated = true;
             }
+            this.trackTruncation(span, truncated);
             attributes[ATTR.MESSAGE_CONTENT] = val;
             attributes[ATTR.MESSAGE_CONTENT_TYPE] = 'text';
             if (truncated && this.config.markTruncatedContent) {
@@ -405,7 +448,7 @@ export class Eval2OtelConverter {
         } else {
           // Structured JSON-like content
           const jsonStr = JSON.stringify(message.content);
-          const redacted = this.redactMessageContent(jsonStr, message.role);
+          const redacted = this.trackRedaction(span, jsonStr, this.redactMessageContent(jsonStr, message.role));
           if (redacted !== null) {
             const max = this.config.contentMaxLength;
             let val = redacted;
@@ -414,6 +457,7 @@ export class Eval2OtelConverter {
               val = redacted.slice(0, max);
               truncated = true;
             }
+            this.trackTruncation(span, truncated);
             attributes[ATTR.MESSAGE_CONTENT_JSON] = val;
             attributes[ATTR.MESSAGE_CONTENT_TYPE] = 'json';
             if (truncated && this.config.markTruncatedContent) {
@@ -444,7 +488,7 @@ export class Eval2OtelConverter {
     evalResult.response.choices.forEach((choice) => {
       const attributes: Record<string, string | number | boolean> = {
         'gen_ai.system': evalResult.system ?? 'unknown',
-        [ATTR.PROVIDER_NAME]: this.getProviderName(evalResult.system) ?? 'unknown',
+        [ATTR.PROVIDER_NAME]: normalizeProviderName(evalResult.system) ?? 'unknown',
         [ATTR.RESPONSE_CHOICE_INDEX]: choice.index,
         [ATTR.RESPONSE_FINISH_REASON]: choice.finishReason,
         [ATTR.MESSAGE_ROLE]: choice.message.role,
@@ -453,7 +497,7 @@ export class Eval2OtelConverter {
       if (choice.message.content !== undefined) {
         if (typeof choice.message.content === 'string') {
           const original = choice.message.content;
-          const redacted = this.redactMessageContent(original, choice.message.role);
+          const redacted = this.trackRedaction(span, original, this.redactMessageContent(original, choice.message.role));
           if (redacted !== null) {
             const max = this.config.contentMaxLength;
             let val = redacted;
@@ -462,6 +506,7 @@ export class Eval2OtelConverter {
               val = redacted.slice(0, max);
               truncated = true;
             }
+            this.trackTruncation(span, truncated);
             attributes[ATTR.MESSAGE_CONTENT] = val;
             attributes[ATTR.MESSAGE_CONTENT_TYPE] = 'text';
             if (truncated && this.config.markTruncatedContent) {
@@ -472,7 +517,7 @@ export class Eval2OtelConverter {
           }
         } else {
           const jsonStr = JSON.stringify(choice.message.content);
-          const redacted = this.redactMessageContent(jsonStr, choice.message.role);
+          const redacted = this.trackRedaction(span, jsonStr, this.redactMessageContent(jsonStr, choice.message.role));
           if (redacted !== null) {
             const max = this.config.contentMaxLength;
             let val = redacted;
@@ -481,6 +526,7 @@ export class Eval2OtelConverter {
               val = redacted.slice(0, max);
               truncated = true;
             }
+            this.trackTruncation(span, truncated);
             attributes[ATTR.MESSAGE_CONTENT_JSON] = val;
             attributes[ATTR.MESSAGE_CONTENT_TYPE] = 'json';
             if (truncated && this.config.markTruncatedContent) {
@@ -505,11 +551,12 @@ export class Eval2OtelConverter {
             [ATTR.TOOL_CALL_ID]: toolCall.id,
             [ATTR.RESPONSE_CHOICE_INDEX]: choice.index,
             [ATTR.TOOL_ARGUMENTS]: this.truncateContent(
-              this.redactToolArguments(
+              this.trackRedaction(span, rawArgs, this.redactToolArguments(
                 rawArgs,
                 toolCall.function.name,
                 toolCall.id
-              ) ?? '{}'
+              )) ?? '{}',
+              span
             ),
             });
           }

@@ -213,11 +213,13 @@ const ragEval: EvalResult = {
 ## Telemetry Model
 
 ### Spans
-The library creates spans following the `{operation} {model}` naming convention with these attributes:
+The library creates operation-centric spans such as `gen_ai.chat`, `gen_ai.embeddings`, and `gen_ai.execute_tool` with these attributes:
 
 - `gen_ai.operation.name`: The operation type (chat, embeddings, execute_tool)
 - `gen_ai.system`: The AI system (openai, anthropic, etc.)
 - `gen_ai.provider.name`: Provider discriminator (`openai`, `anthropic`, `aws.bedrock`, `azure.openai`, `google.vertex`, `ollama`)
+- `evalops.contract.version`: Eval2Otel telemetry contract version
+- `evalops.eval.id`: Stable evaluation identifier
 - `gen_ai.request.model`: Model name
 - `gen_ai.request.temperature`: Temperature setting
 - `gen_ai.usage.input_tokens`: Input token count
@@ -245,9 +247,45 @@ Automatically recorded metrics include:
 - `gen_ai.client.operation.duration`: Operation duration
 - `gen_ai.server.time_to_first_token`: Time to first token
 - `gen_ai.server.time_per_output_token`: Time per output token
+- `eval2otel.conversion.count`: Eval2Otel conversion attempts by status
+- `eval2otel.conversion.warning_count`: Conversion warnings for SLO gates
+- `eval2otel.conversion.dropped_event_count`: Operational events dropped by caps
+- `eval2otel.conversion.redacted_content_count`: Content fields redacted during conversion
 - Custom evaluation metrics (accuracy, BLEU, etc.)
 
 Streaming support: record TTFT and inter-token timings when provided (client or server streaming).
+
+### Contract, Provenance, And Evidence
+
+Eval2Otel publishes a versioned telemetry contract in [docs/contract/eval2otel-v1.md](./docs/contract/eval2otel-v1.md). The contract is backed by golden fixtures in `test/fixtures/conformance` so provider and framework adapters cannot drift silently.
+
+`EvalResult` accepts optional `provenance` and `evidence` metadata for audit joins:
+
+```typescript
+const evalResult: EvalResult = {
+  id: 'case-123',
+  timestamp: Date.now(),
+  model: 'gpt-4o-mini',
+  system: 'openai',
+  operation: 'chat',
+  request: { model: 'gpt-4o-mini' },
+  response: {},
+  usage: {},
+  performance: { duration: 0.8 },
+  provenance: {
+    sourceFramework: 'promptfoo',
+    runId: 'run-2026-05-18',
+    caseId: 'case-123',
+    datasetId: 'evalops-core',
+    datasetVersion: '2026.05',
+  },
+  evidence: {
+    rawPayloadSha256: '...',
+    promptSha256: '...',
+    responseSha256: '...',
+  },
+};
+```
 
 ## Configuration
 

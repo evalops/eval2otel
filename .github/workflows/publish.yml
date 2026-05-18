@@ -4,6 +4,10 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -29,8 +33,17 @@ jobs:
       
       - name: Test
         run: npm test
+
+      - name: Package smoke
+        run: |
+          npm pack --dry-run
+          npm pack
+          package_file="$(ls eval2otel-*.tgz | head -n1)"
+          mkdir /tmp/eval2otel-smoke
+          npm install --prefix /tmp/eval2otel-smoke "$package_file"
+          node -e "const pkg = require('/tmp/eval2otel-smoke/node_modules/eval2otel'); if (!pkg.createEval2Otel || !pkg.EVAL2OTEL_CONTRACT_VERSION) process.exit(1)"
       
       - name: Publish to NPM
-        run: npm publish
+        run: npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -31,5 +31,35 @@ describe('Metrics counters and histograms', () => {
     expect(meter.histograms.has('eval.accuracy')).toBe(true);
     expect(meter.histograms.get('eval.accuracy')!.records[0].value).toBe(0.9);
   });
-});
 
+  it('records eval2otel conversion operational telemetry', () => {
+    const meter = new FakeMeter();
+    jest.spyOn(otMetrics, 'getMeter').mockReturnValue(meter as any);
+    const m = new Eval2OtelMetrics({ serviceName: 'svc' });
+    const evalResult: EvalResult = {
+      id: 'm3', timestamp: Date.now(), model: 'gpt-4', system: 'openai', operation: 'chat',
+      request: { model: 'gpt-4' }, response: {}, usage: {}, performance: { duration: 1 },
+    } as any;
+
+    m.recordConversionTelemetry(evalResult, {
+      evalId: 'm3',
+      success: true,
+      contractVersion: 'eval2otel.v1',
+      semconvVersion: '1.37.0',
+      spanName: 'gen_ai.chat',
+      eventCount: 2,
+      droppedEventCount: 1,
+      redactedContentCount: 1,
+      truncatedContentCount: 1,
+      warningCount: 0,
+      warnings: [],
+      durationMs: 12,
+    });
+
+    expect(meter.counters.get('eval2otel.conversion.count')!.adds[0].value).toBe(1);
+    expect(meter.histograms.get('eval2otel.conversion.duration')!.records[0].value).toBe(12);
+    expect(meter.histograms.get('eval2otel.conversion.dropped_event_count')!.records[0].value).toBe(1);
+    expect(meter.histograms.get('eval2otel.conversion.redacted_content_count')!.records[0].value).toBe(1);
+    expect(meter.histograms.get('eval2otel.conversion.truncated_content_count')!.records[0].value).toBe(1);
+  });
+});

@@ -1,4 +1,11 @@
-import { detectProvider, convertProviderToEvalResult, convertAnyProvider, isProviderKnown, listSupportedProviders } from '../src/helpers';
+import {
+  detectProvider,
+  convertProviderToEvalResult,
+  convertProviderWithEvidence,
+  convertAnyProvider,
+  isProviderKnown,
+  listSupportedProviders,
+} from '../src/helpers';
 
 describe('helpers: detectProvider / convertProviderToEvalResult', () => {
   it('detects openai-chat and converts to EvalResult', () => {
@@ -97,6 +104,46 @@ describe('helpers: detectProvider / convertProviderToEvalResult', () => {
     expect(isProviderKnown('unknown')).toBe(false);
     const list = listSupportedProviders();
     expect(list).toContain('vertex');
+  });
+
+  it('convertProviderWithEvidence enriches adapter provenance and raw payload hash', () => {
+    const start = Date.now();
+    const request = { model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'hi' }] };
+    const response = {
+      object: 'chat.completion',
+      id: 'chatcmpl-1',
+      model: 'gpt-4o-mini',
+      choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'hello' } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    };
+
+    const result = convertProviderWithEvidence({
+      request,
+      response,
+      startTime: start,
+      endTime: start + 1000,
+      provider: 'openai-chat',
+    });
+
+    expect(result.confidence).toBe('explicit');
+    expect(result.evalResult?.provenance?.adapter).toBe('openai-chat');
+    expect(result.evalResult?.provenance?.contractVersion).toBe('eval2otel.v1');
+    expect(result.evalResult?.evidence?.rawPayloadSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('convertProviderWithEvidence reports unsupported provider modes', () => {
+    const result = convertProviderWithEvidence({
+      request: {},
+      response: {},
+      startTime: Date.now(),
+      provider: 'mystery-provider',
+    });
+
+    expect(result.evalResult).toBeNull();
+    expect(result.confidence).toBe('unknown');
+    expect(result.warnings[0].code).toBe('provider.unsupported');
+    expect(result.evidence.warningCount).toBe(1);
   });
 
 });

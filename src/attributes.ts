@@ -20,6 +20,25 @@ export const ATTR = {
   // Provider
   PROVIDER_NAME: 'gen_ai.provider.name',
 
+  // Eval2Otel contract/evidence attributes
+  CONTRACT_VERSION: 'evalops.contract.version',
+  SEMCONV_VERSION: 'evalops.semconv.version',
+  EVAL_ID: 'evalops.eval.id',
+  SOURCE_FRAMEWORK: 'evalops.source.framework',
+  RUN_ID: 'evalops.run.id',
+  CASE_ID: 'evalops.case.id',
+  DATASET_ID: 'evalops.dataset.id',
+  DATASET_VERSION: 'evalops.dataset.version',
+  ADAPTER_NAME: 'evalops.adapter.name',
+  ADAPTER_VERSION: 'evalops.adapter.version',
+  RAW_PAYLOAD_SHA256: 'evalops.raw_payload_sha256',
+  PROMPT_SHA256: 'evalops.prompt_sha256',
+  RESPONSE_SHA256: 'evalops.response_sha256',
+  WARNING_COUNT: 'evalops.warning_count',
+  DROPPED_EVENT_COUNT: 'evalops.dropped_event_count',
+  REDACTED_CONTENT_COUNT: 'evalops.redacted_content_count',
+  TRUNCATED_CONTENT_COUNT: 'evalops.truncated_content_count',
+
   // Privacy helpers
   CONTENT_SHA256: 'evalops.content_sha256',
 } as const;
