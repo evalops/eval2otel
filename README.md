@@ -15,12 +15,12 @@ content by default.
 
 - OpenTelemetry GenAI spans: `gen_ai.chat`, `gen_ai.embeddings`, `gen_ai.execute_tool`, `gen_ai.agent`, and `gen_ai.workflow`
 - Provider adapters for OpenAI chat, OpenAI-compatible APIs, Anthropic, Cohere, AWS Bedrock, Google Vertex, and Ollama
-- Promptfoo result conversion with run, case, dataset, score, assertion, provenance, and evidence metadata
+- Framework adapters for Promptfoo, RAGAS, and DeepEval with run, case, dataset, score, provenance, and evidence metadata
 - RAG scoring for context precision, recall, faithfulness, MRR, NDCG, citation coverage, top-k relevance, and context-token use
 - Privacy controls for opt-in content capture, redaction-to-string, redaction-to-fingerprint, truncation flags, and event caps
 - A versioned `eval2otel.v1` contract backed by conformance fixtures
 - Operational telemetry about Eval2Otel itself: conversion count, warnings, dropped events, redactions, truncations, and duration
-- A Python contract scaffold for teams that want the same Eval2Otel payload shape outside TypeScript
+- A Python SDK preview with optional OTLP spans, content events, PII redaction, and provider instrumentation hooks
 
 ## Install
 
@@ -164,12 +164,16 @@ Supported adapter modes:
 Every adapter result includes structured warnings and raw payload evidence
 hashes, so conversion failures can be reported without dumping raw payloads.
 
-## Promptfoo Adapter
+## Framework Adapters
 
 Promptfoo results can be converted directly into Eval2Otel results:
 
 ```ts
-import { convertPromptfooToEvalResults } from 'eval2otel';
+import {
+  convertDeepEvalToEvalResults,
+  convertPromptfooToEvalResults,
+  convertRagasToEvalResults,
+} from 'eval2otel';
 
 const { evalResults, warnings } = convertPromptfooToEvalResults(promptfooJson, {
   runId: 'promptfoo-nightly',
@@ -190,6 +194,31 @@ if (warnings.length > 0) {
 The adapter preserves Promptfoo success, score, assertion counts, failed
 assertion warnings, metric names, run identity, case identity, and payload
 hashes.
+
+RAGAS and DeepEval exports use the same conversion shape:
+
+```ts
+const ragas = convertRagasToEvalResults(ragasJson, {
+  runId: 'ragas-nightly',
+  datasetId: 'rag-evals',
+  defaultModel: 'gpt-4o-mini',
+});
+
+const deepeval = convertDeepEvalToEvalResults(deepevalJson, {
+  runId: 'deepeval-nightly',
+  includeExplanations: true,
+  defaultModel: 'gpt-4o-mini',
+});
+
+for (const result of [...ragas.evalResults, ...deepeval.evalResults]) {
+  eval2otel.processEvaluation(result);
+}
+```
+
+RAGAS rows populate RAG metrics such as context precision, context recall,
+answer relevance, and faithfulness. DeepEval rows preserve metric scores,
+failed-metric warnings, expected-output fingerprints, and retrieval context as
+RAG chunk evidence.
 
 ## RAG Telemetry
 
@@ -338,23 +367,25 @@ Each provider-native line should look like:
 {"startTime":1725170000000,"endTime":1725170001200,"request":{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]},"response":{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4o-mini","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}}
 ```
 
-## Python Scaffold
+## Python SDK Preview
 
-The TypeScript package is the production emitter today. The Python directory
-contains a small contract-first scaffold with the same `eval2otel.v1`
-provenance/evidence/report vocabulary:
+The Python package mirrors the `eval2otel.v1` provenance, evidence, and
+conversion-report vocabulary. It can run contract-only with no OpenTelemetry
+dependency, or emit real spans when the optional OTel extras are installed:
 
 ```bash
+pip install -e "python[otel]"
 PYTHONPATH=python python3 -m unittest discover -s python/tests
 ```
 
 ```python
-from eval2otel import Eval2Otel
+from eval2otel import instrument_all
 
-client = Eval2Otel(service_name="pytest", semconv_version="1.37.0")
+client = instrument_all()
 report = client.process_evaluation({
     "id": "py-case-1",
     "model": "gpt-4o-mini",
+    "system": "openai",
     "operation": "chat",
     "request": {"model": "gpt-4o-mini"},
     "response": {},
@@ -363,6 +394,18 @@ report = client.process_evaluation({
 
 assert report.contract_version == "eval2otel.v1"
 ```
+
+`instrument_all()` honors the common OTLP environment variables plus:
+
+- `EVAL2OTEL_SERVICE_NAME`
+- `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`
+- `EVAL2OTEL_SAMPLE_RATE`
+- `EVAL2OTEL_REDACT_PII`
+- `EVAL2OTEL_PROVIDERS`
+
+Provider hooks are optional. If provider packages and compatible
+OpenLLMetry/OpenInference instrumentors are installed, Eval2Otel invokes them;
+otherwise it returns structured handles explaining what was available.
 
 See [python/README.md](./python/README.md).
 

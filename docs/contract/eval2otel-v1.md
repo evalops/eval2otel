@@ -43,6 +43,7 @@ attributes intentionally aligned with:
   exists yet;
 - Eval2Otel-owned `evalops.*` contract, privacy, provenance, and evidence
   attributes;
+- framework-specific `eval.*` diagnostic attributes;
 - provider-prefixed diagnostic attributes such as `openai.*`,
   `anthropic.*`, and `google.vertex.*`.
 
@@ -131,8 +132,15 @@ Provider-native adapters should return a `ProviderConversionResult` with:
 - structured warnings;
 - evidence containing at least `rawPayloadSha256`.
 
-Promptfoo conversion additionally emits `eval.promptfoo.*` attributes for pass
-state, score, assertion counts, failed assertion counts, and metric names.
+Framework adapters additionally emit namespaced `eval.*` attributes:
+
+- Promptfoo: `eval.promptfoo.*` for pass state, score, assertion counts, failed
+  assertion counts, and metric names.
+- RAGAS: `eval.ragas.*` for source metric values, metric names, and reference
+  fingerprints. Shared RAG quality fields are also copied into
+  `EvalResult.rag.metrics`.
+- DeepEval: `eval.deepeval.*` for pass state, failed metric counts, normalized
+  metric scores, metric names, and expected-output fingerprints.
 
 ## Operational Telemetry
 

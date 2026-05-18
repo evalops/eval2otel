@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "eval2otel-python"
 version = "0.1.0"
-description = "Contract-first Python scaffold for eval2otel telemetry payloads"
+description = "Python SDK preview for eval2otel telemetry payloads"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -13,6 +13,18 @@ authors = [
   { name = "EvalOps" }
 ]
 keywords = ["opentelemetry", "genai", "evaluation", "observability"]
+
+[project.optional-dependencies]
+otel = [
+  "opentelemetry-api>=1.29",
+  "opentelemetry-sdk>=1.29",
+  "opentelemetry-exporter-otlp>=1.29",
+]
+providers = [
+  "openai>=1",
+  "anthropic>=0.34",
+  "cohere>=5",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["eval2otel"]
