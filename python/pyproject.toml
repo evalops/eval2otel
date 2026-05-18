@@ -7,7 +7,7 @@ name = "eval2otel-python"
 version = "0.1.0"
 description = "Python SDK preview for eval2otel telemetry payloads"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
   { name = "EvalOps" }
@@ -19,12 +19,19 @@ otel = [
   "opentelemetry-api>=1.29",
   "opentelemetry-sdk>=1.29",
   "opentelemetry-exporter-otlp>=1.29",
+  "opentelemetry-instrumentation>=0.50b0",
+]
+validation = [
+  "pydantic>=2",
 ]
 providers = [
   "openai>=1",
   "anthropic>=0.34",
   "cohere>=5",
 ]
+
+[project.entry-points.opentelemetry_instrumentor]
+eval2otel = "eval2otel.autoinstrument:Eval2OtelInstrumentor"
 
 [tool.hatch.build.targets.wheel]
 packages = ["eval2otel"]

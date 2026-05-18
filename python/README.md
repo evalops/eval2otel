@@ -6,7 +6,7 @@ those extras, it still validates Eval2Otel payloads and returns conversion
 reports.
 
 ```bash
-pip install -e ".[otel]"
+pip install -e ".[otel,validation]"
 ```
 
 ```python
@@ -38,6 +38,30 @@ report = client.process_evaluation({
 
 assert report.contract_version == "eval2otel.v1"
 client.shutdown()
+```
+
+## Zero-Code Instrumentation
+
+The package registers an `opentelemetry_instrumentor` entry point named
+`eval2otel`. In an environment with `opentelemetry-instrumentation` installed,
+`opentelemetry-instrument` can discover Eval2Otel and call the same
+`instrument_all()` path used above:
+
+```bash
+OTEL_SERVICE_NAME=my-ai-service \
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
+EVAL2OTEL_PROVIDERS=openai,anthropic \
+opentelemetry-instrument python main.py
+```
+
+Programmatic use is also available:
+
+```python
+from eval2otel import Eval2OtelInstrumentor, get_instrumented_client
+
+Eval2OtelInstrumentor().instrument()
+client = get_instrumented_client()
 ```
 
 ## Environment
@@ -76,6 +100,24 @@ Supported provider names:
 - `huggingface`
 
 Set `EVAL2OTEL_PROVIDERS=openai,anthropic` to limit discovery.
+
+## Typed Validation
+
+Install the `validation` extra to use optional Pydantic models:
+
+```python
+from eval2otel.models import EvalResultModel
+
+payload = EvalResultModel.model_validate({
+    "id": "case-1",
+    "model": "gpt-4o-mini",
+    "operation": "chat",
+    "request": {"model": "gpt-4o-mini"},
+    "performance": {"duration": 0.25},
+})
+
+client.process_evaluation(payload.to_eval_result())
+```
 
 ## Development
 

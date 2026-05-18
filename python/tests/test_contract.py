@@ -3,10 +3,12 @@ from unittest import mock
 
 from eval2otel import (
     EVAL2OTEL_CONTRACT_VERSION,
+    Eval2OtelInstrumentor,
     Eval2Otel,
     EvalResult,
     build_eval2otel_attributes,
     build_span_attributes,
+    get_instrumented_client,
     instrument_all,
     instrument_all_providers,
     instrument_openai,
@@ -156,6 +158,39 @@ class ContractTest(unittest.TestCase):
         self.assertTrue(handle.instrumented)
         self.assertEqual(handle.instrumentation, "opentelemetry.instrumentation.openai.OpenAIInstrumentor")
         self.assertEqual(FakeOpenAIInstrumentor.calls, [{}])
+
+    def test_auto_instrumentor_entrypoint_uses_env_configuration(self) -> None:
+        instrumentor = Eval2OtelInstrumentor()
+        with mock.patch.dict("os.environ", {"EVAL2OTEL_PROVIDERS": "unknown"}, clear=False):
+            instrumentor.instrument()
+
+        client = get_instrumented_client()
+        self.assertIsInstance(client, Eval2Otel)
+        self.assertEqual(client.service_name, "eval2otel-python")
+        self.assertEqual(len(client.instrumentation_handles), 1)
+        self.assertEqual(client.instrumentation_handles[0].provider, "unknown")
+
+        instrumentor.uninstrument()
+        self.assertIsNone(get_instrumented_client())
+
+    def test_pydantic_model_validates_and_converts_eval_results(self) -> None:
+        try:
+            from eval2otel.models import EvalResultModel, validate_eval_result
+        except ImportError as exc:
+            self.skipTest(str(exc))
+
+        model = EvalResultModel.model_validate({
+            "id": "py-pydantic",
+            "model": "gpt-4o-mini",
+            "operation": "chat",
+            "request": {"model": "gpt-4o-mini"},
+            "performance": {"duration": 0.2},
+            "provenance": {"sourceFramework": "pytest", "caseId": "case-1"},
+        })
+        result = model.to_eval_result()
+        self.assertIsInstance(result, EvalResult)
+        self.assertEqual(result.provenance.source_framework, "pytest")
+        self.assertEqual(validate_eval_result(model.model_dump(by_alias=True)).id, "py-pydantic")
 
     def test_required_contract_fields_are_validated(self) -> None:
         with self.assertRaisesRegex(ValueError, "performance.duration"):

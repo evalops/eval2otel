@@ -1,4 +1,5 @@
 from .auto import instrument_all
+from .autoinstrument import Eval2OtelInstrumentor, get_instrumented_client
 from .contract import (
     EVAL2OTEL_CONTRACT_VERSION,
     UNKNOWN_SEMCONV_VERSION,
@@ -30,12 +31,14 @@ __all__ = [
     "ConversionReport",
     "ConversionWarning",
     "Eval2Otel",
+    "Eval2OtelInstrumentor",
     "Eval2OtelEvidence",
     "Eval2OtelProvenance",
     "EvalResult",
     "build_eval2otel_attributes",
     "build_span_attributes",
     "instrument_all",
+    "get_instrumented_client",
     "instrument_all_providers",
     "instrument_anthropic",
     "instrument_bedrock",
