@@ -725,7 +725,7 @@ export function convertAzureOpenAIToEval2Otel(
       attributes: {
         ...(pfr ? { 'azure.openai.prompt_filter_results': JSON.stringify(pfr) } : {}),
         ...(safetyFlagged !== undefined ? { 'gen_ai.safety.flagged': safetyFlagged } : {}),
-        ...(safetyCategories && safetyCategories.length ? { 'gen_ai.safety.categories': safetyCategories } : {}),
+        ...(safetyCategories?.length ? { 'gen_ai.safety.categories': safetyCategories } : {}),
       },
     },
     conversation: request.messages ? { id: options.conversationId ?? `conv-${evalId}`, messages: request.messages as any } : undefined,

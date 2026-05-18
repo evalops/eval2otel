@@ -6,6 +6,7 @@ describe('Eval2Otel', () => {
       serviceName: 'test-service',
       serviceVersion: '1.0.0',
       captureContent: false,
+      useSdk: false,
     });
 
     expect(eval2otel).toBeDefined();
@@ -17,6 +18,7 @@ describe('Eval2Otel', () => {
     const eval2otel = createEval2Otel({
       serviceName: 'test-service',
       captureContent: false,
+      useSdk: false,
     });
 
     const evalResult: EvalResult = {
@@ -67,6 +69,7 @@ describe('Eval2Otel', () => {
     const eval2otel = createEval2Otel({
       serviceName: 'test-service',
       captureContent: false,
+      useSdk: false,
     });
 
     const evalResult: EvalResult = {
@@ -115,6 +118,7 @@ describe('Eval2Otel', () => {
     // Clean up any initialized instances
     const eval2otel = createEval2Otel({
       serviceName: 'cleanup-test',
+      useSdk: false,
     });
     await eval2otel.shutdown();
   });
