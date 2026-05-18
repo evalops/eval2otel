@@ -374,7 +374,7 @@ conversion-report vocabulary. It can run contract-only with no OpenTelemetry
 dependency, or emit real spans when the optional OTel extras are installed:
 
 ```bash
-pip install -e "python[otel]"
+pip install -e "python[otel,validation]"
 PYTHONPATH=python python3 -m unittest discover -s python/tests
 ```
 
@@ -406,6 +406,11 @@ assert report.contract_version == "eval2otel.v1"
 Provider hooks are optional. If provider packages and compatible
 OpenLLMetry/OpenInference instrumentors are installed, Eval2Otel invokes them;
 otherwise it returns structured handles explaining what was available.
+The Python package also registers an `opentelemetry_instrumentor` entry point
+named `eval2otel`, so `opentelemetry-instrument python main.py` can discover the
+same `instrument_all()` path when the OTel instrumentation extra is installed.
+Install the `validation` extra for optional Pydantic models in
+`eval2otel.models`.
 
 See [python/README.md](./python/README.md).
 
