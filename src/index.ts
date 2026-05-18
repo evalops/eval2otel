@@ -49,8 +49,8 @@ export class Eval2Otel {
 
     // Determine final service.name respecting environment precedence
     const envServiceName = process.env.OTEL_SERVICE_NAME
-      || (baseResource as any).attributes?.[SemanticResourceAttributes.SERVICE_NAME];
-    const finalServiceName = (envServiceName as string) || this.config.serviceName;
+      ?? (baseResource as any).attributes?.[SemanticResourceAttributes.SERVICE_NAME];
+    const finalServiceName = (envServiceName as string | undefined) ?? this.config.serviceName;
 
     const resourceAttributes: Record<string, string> = {
       [SemanticResourceAttributes.SERVICE_NAME]: finalServiceName,
