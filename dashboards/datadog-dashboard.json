@@ -85,13 +85,13 @@
     {
       "id": 4,
       "definition": {
-        "title": "Error Rate by System",
+        "title": "Error Rate by Provider",
         "title_size": "16",
         "title_align": "left",
         "type": "query_value",
         "requests": [
           {
-            "q": "sum:gen_ai.client.operation.error{*} by {gen_ai.system}.as_rate() / sum:gen_ai.client.operation.duration{*} by {gen_ai.system}.as_count()",
+            "q": "sum:gen_ai.client.operation.error{*} by {gen_ai.provider.name}.as_rate() / sum:gen_ai.client.operation.duration{*} by {gen_ai.provider.name}.as_count()",
             "aggregator": "last"
           }
         ],
@@ -232,9 +232,9 @@
       "prefix": "gen_ai.request.model"
     },
     {
-      "name": "system",
+      "name": "provider",
       "default": "*",
-      "prefix": "gen_ai.system"
+      "prefix": "gen_ai.provider.name"
     }
   ],
   "layout_type": "ordered",

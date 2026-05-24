@@ -74,7 +74,7 @@ curl "http://localhost:16686/api/traces?service=eval2otel-e2e-test"
 ### Traces in Jaeger
 - Service: `eval2otel-e2e-test`
 - Span names: `gen_ai.chat`, `gen_ai.embeddings`, `gen_ai.execute_tool`
-- Attributes: `gen_ai.system=openai`, `gen_ai.request.model=gpt-4`, etc.
+- Attributes: `gen_ai.provider.name=openai`, `gen_ai.request.model=gpt-4`, etc.
 - Events: Message events (when `captureContent=true`)
 
 ### Metrics in Prometheus

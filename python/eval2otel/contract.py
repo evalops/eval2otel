@@ -12,6 +12,23 @@ EVAL2OTEL_CONTRACT_VERSION = "eval2otel.v1"
 UNKNOWN_SEMCONV_VERSION = "unspecified"
 
 
+def normalize_provider_name(system: str | None) -> str | None:
+    if not system:
+        return None
+    value = system.lower()
+    if "azure" in value:
+        return "azure.openai"
+    if "bedrock" in value or "aws" in value:
+        return "aws.bedrock"
+    if "vertex" in value or "gemini" in value or "google" in value:
+        return "google.vertex"
+    if "anthropic" in value or "claude" in value:
+        return "anthropic"
+    if "openai" in value:
+        return "openai"
+    return value
+
+
 def sha256_payload(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
@@ -302,7 +319,7 @@ def build_span_attributes(
 ) -> MutableMapping[str, str | int | float]:
     attrs: MutableMapping[str, str | int | float] = build_eval2otel_attributes(eval_result, semconv_version)
     attrs["gen_ai.operation.name"] = eval_result.operation
-    attrs["gen_ai.system"] = eval_result.system or "unknown"
+    attrs["gen_ai.provider.name"] = normalize_provider_name(eval_result.system) or "unknown"
     if eval_result.request.get("model") is not None:
         attrs["gen_ai.request.model"] = str(eval_result.request["model"])
     if eval_result.response.get("model") is not None:
