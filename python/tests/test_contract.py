@@ -100,7 +100,8 @@ class ContractTest(unittest.TestCase):
 
         self.assertEqual(report.event_count, 2)
         self.assertEqual(tracer.spans[0].name, "gen_ai.chat")
-        self.assertEqual(tracer.spans[0].attributes["gen_ai.system"], "openai")
+        self.assertEqual(tracer.spans[0].attributes["gen_ai.provider.name"], "openai")
+        self.assertNotIn("gen_ai.system", tracer.spans[0].attributes)
         self.assertEqual(tracer.spans[0].attributes["gen_ai.usage.input_tokens"], 3)
         self.assertEqual(tracer.spans[0].events[0][0], "gen_ai.user.message")
         self.assertIn("evalops.content_sha256", tracer.spans[0].events[0][1])

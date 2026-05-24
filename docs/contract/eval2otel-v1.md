@@ -19,7 +19,7 @@ Every converted evaluation creates one client span named by operation:
 Every span must include:
 
 - `gen_ai.operation.name`
-- `gen_ai.system`
+- `gen_ai.provider.name`
 - `evalops.contract.version`
 - `evalops.semconv.version`
 - `evalops.eval.id`
@@ -28,8 +28,9 @@ Every span must include:
 - `evalops.redacted_content_count`
 - `evalops.truncated_content_count`
 
-Provider-aware conversions should include `gen_ai.provider.name` using the
-normalized provider names exported by `normalizeProviderName`.
+`gen_ai.provider.name` uses the normalized provider names exported by
+`normalizeProviderName`. `gen_ai.system` is intentionally not emitted because it
+is no longer present in the upstream OpenTelemetry GenAI registry.
 
 ## Attribute Registry
 

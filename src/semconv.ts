@@ -12,7 +12,6 @@ export interface AttributeSpec {
 
 export const ATTRIBUTE_REGISTRY: AttributeSpec[] = [
   { key: 'gen_ai.operation.name', source: 'otel-genai', signal: 'all', stability: 'stable', description: 'GenAI operation name.' },
-  { key: 'gen_ai.system', source: 'otel-genai', signal: 'all', stability: 'stable', description: 'AI system or provider family.' },
   { key: 'error.type', source: 'otel-genai', signal: 'all', stability: 'stable', description: 'Error type for failed operations.' },
   { key: 'deployment.environment', source: 'otel-genai', signal: 'all', stability: 'stable', description: 'Deployment environment resource/context attribute.' },
   { key: ATTR.PROVIDER_NAME, source: 'otel-genai', signal: 'all', stability: 'stable', description: 'Normalized provider name.' },

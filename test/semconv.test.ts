@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { parse } from 'yaml';
 import {
   ATTRIBUTE_REGISTRY,
   assertRegisteredAttributes,
@@ -47,5 +48,28 @@ describe('semantic convention registry', () => {
         assertRegisteredAttributes(attrs);
       }
     }
+  });
+
+  it('keeps stable GenAI attributes aligned with the upstream registry fixture', () => {
+    const fixturePath = path.join(__dirname, 'fixtures', 'otel', 'gen-ai-registry.yaml');
+    const registry = parse(fs.readFileSync(fixturePath, 'utf8')) as { attributes?: Array<{ key?: string }> };
+    const upstreamKeys = new Set((registry.attributes ?? [])
+      .map(attribute => attribute.key)
+      .filter((key): key is string => typeof key === 'string'));
+
+    expect(upstreamKeys).toContain(ATTR.PROVIDER_NAME);
+    expect(upstreamKeys).not.toContain('gen_ai.system');
+    expect(isRegisteredAttribute('gen_ai.system')).toBe(false);
+
+    const stableSpanKeys = ATTRIBUTE_REGISTRY
+      .filter(spec => spec.source === 'otel-genai')
+      .filter(spec => spec.stability === 'stable')
+      .filter(spec => spec.signal !== 'metric')
+      .map(spec => spec.key)
+      .filter(key => key.startsWith('gen_ai.'))
+      .sort();
+    const missingFromUpstream = stableSpanKeys.filter(key => !upstreamKeys.has(key));
+
+    expect(missingFromUpstream).toEqual([]);
   });
 });

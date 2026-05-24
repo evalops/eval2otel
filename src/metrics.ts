@@ -1,4 +1,5 @@
 import { metrics, Counter, Histogram, Meter, context as otContext } from '@opentelemetry/api';
+import { ATTR } from './attributes';
 import { normalizeProviderName } from './contract';
 import { getRagMetricValue } from './rag';
 import { ConversionReport, EvalResult, OtelConfig, ProcessOptions } from './types';
@@ -208,16 +209,10 @@ export class Eval2OtelMetrics {
   recordMetrics(evalResult: EvalResult, options?: ProcessOptions): void {
     const baseAttributes = {
       'gen_ai.operation.name': evalResult.operation,
-      'gen_ai.system': evalResult.system ?? 'unknown',
+      [ATTR.PROVIDER_NAME]: normalizeProviderName(evalResult.system) ?? 'unknown',
       'gen_ai.request.model': evalResult.request.model,
       'gen_ai.response.model': evalResult.response.model ?? evalResult.request.model,
     };
-
-    // Provider discriminator aligned with latest GenAI semconv
-    const provider = normalizeProviderName(evalResult.system);
-    if (provider) {
-      (baseAttributes as any)['gen_ai.provider.name'] = provider;
-    }
 
     // Add error type if present
     const attributes: Record<string, string | number> = { ...baseAttributes };
@@ -388,9 +383,8 @@ export class Eval2OtelMetrics {
       attrs['gen_ai.operation.name'] = evalResult.operation;
     }
     if (evalResult?.system) {
-      attrs['gen_ai.system'] = evalResult.system;
       const provider = normalizeProviderName(evalResult.system);
-      if (provider) attrs['gen_ai.provider.name'] = provider;
+      if (provider) attrs[ATTR.PROVIDER_NAME] = provider;
     }
     if (evalResult?.request?.model) {
       attrs['gen_ai.request.model'] = evalResult.request.model;
@@ -506,7 +500,7 @@ export class Eval2OtelMetrics {
   }): void {
     const baseAttributes = {
       'gen_ai.operation.name': evalResult.operation,
-      'gen_ai.system': evalResult.system ?? 'unknown',
+      [ATTR.PROVIDER_NAME]: normalizeProviderName(evalResult.system) ?? 'unknown',
       'gen_ai.request.model': evalResult.request.model,
     };
 

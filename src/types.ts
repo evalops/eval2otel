@@ -338,7 +338,7 @@ export interface ProcessOptions {
 export interface GenAIAttributes {
   // Required
   'gen_ai.operation.name': string;
-  'gen_ai.system': string;
+  'gen_ai.provider.name': string;
   
   // Conditionally required
   'error.type'?: string;

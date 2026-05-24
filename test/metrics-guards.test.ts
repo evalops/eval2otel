@@ -16,7 +16,7 @@ describe('Metrics guardrails: allowlist and cap', () => {
     const m = new Eval2OtelMetrics({
       serviceName: 'svc',
       enableExemplars: true,
-      metricAttributeAllowlist: ['gen_ai.operation.name', 'gen_ai.system', 'gen_ai.request.model', 'gen_ai.token.type'],
+      metricAttributeAllowlist: ['gen_ai.operation.name', 'gen_ai.provider.name', 'gen_ai.request.model', 'gen_ai.token.type'],
       maxMetricAttributes: 3,
     } as any);
 
@@ -33,8 +33,7 @@ describe('Metrics guardrails: allowlist and cap', () => {
     // Only allowlisted keys remain and capped to 3 keys
     expect(Object.keys(attrs).sort()).toHaveLength(3);
     Object.keys(attrs).forEach(k => {
-      expect(['gen_ai.operation.name', 'gen_ai.system', 'gen_ai.request.model', 'gen_ai.token.type']).toContain(k);
+      expect(['gen_ai.operation.name', 'gen_ai.provider.name', 'gen_ai.request.model', 'gen_ai.token.type']).toContain(k);
     });
   });
 });
-

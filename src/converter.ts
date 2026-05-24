@@ -246,17 +246,12 @@ export class Eval2OtelConverter {
     evalResult: EvalResult, 
     additionalAttributes?: Record<string, string | number | boolean>
   ): GenAIAttributes {
+    const provider = normalizeProviderName(evalResult.system) ?? 'unknown';
     const attributes: GenAIAttributes = {
       'gen_ai.operation.name': evalResult.operation,
-      'gen_ai.system': evalResult.system ?? 'unknown',
+      [ATTR.PROVIDER_NAME]: provider,
       ...buildEval2OtelAttributes(evalResult, this.config),
     };
-
-    // Provider discriminator aligned with latest GenAI semconv
-    const provider = normalizeProviderName(evalResult.system);
-    if (provider) {
-      (attributes as any)[ATTR.PROVIDER_NAME] = provider;
-    }
 
     // Add service attributes
     if (this.config.environment) {
@@ -454,7 +449,6 @@ export class Eval2OtelConverter {
     evalResult.conversation.messages.forEach((message, index) => {
       const eventName = `gen_ai.${message.role}.message`;
       const attributes: Record<string, string | number | boolean> = {
-        'gen_ai.system': evalResult.system ?? 'unknown',
         [ATTR.PROVIDER_NAME]: normalizeProviderName(evalResult.system) ?? 'unknown',
         [ATTR.MESSAGE_ROLE]: message.role,
         [ATTR.MESSAGE_INDEX]: index,
@@ -524,7 +518,6 @@ export class Eval2OtelConverter {
 
     evalResult.response.choices.forEach((choice) => {
       const attributes: Record<string, string | number | boolean> = {
-        'gen_ai.system': evalResult.system ?? 'unknown',
         [ATTR.PROVIDER_NAME]: normalizeProviderName(evalResult.system) ?? 'unknown',
         [ATTR.RESPONSE_CHOICE_INDEX]: choice.index,
         [ATTR.RESPONSE_FINISH_REASON]: choice.finishReason,
@@ -583,7 +576,7 @@ export class Eval2OtelConverter {
             : JSON.stringify(toolCall.function.arguments);
           if (this.canAddEvent(span)) {
             span.addEvent('gen_ai.tool.message', {
-            'gen_ai.system': evalResult.system ?? 'unknown',
+            [ATTR.PROVIDER_NAME]: normalizeProviderName(evalResult.system) ?? 'unknown',
             [ATTR.TOOL_NAME]: toolCall.function.name,
             [ATTR.TOOL_CALL_ID]: toolCall.id,
             [ATTR.RESPONSE_CHOICE_INDEX]: choice.index,
